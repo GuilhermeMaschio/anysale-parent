@@ -1,0 +1,17 @@
+services:
+  kafdrop:
+    image: obsidiandynamics/kafdrop:4.0.2
+    container_name: kafdrop-anysale
+    environment:
+      KAFKA_BROKERCONNECT: "kafka:9092"
+    ports: ["19000:9000"]
+    depends_on: [kafka]
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: pgadmin-anysale
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@anysale.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports: ["15432:80"]
+    depends_on: [postgres]
