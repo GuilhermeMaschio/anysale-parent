@@ -1,164 +1,100 @@
 AnySale
 
-Sistema para gerenciar leads e acelerar fechamento de vendas de qualquer produto, com sugestões automáticas e notificações.
-Arquitetura hexagonal, serviços Spring Boot, mensageria Kafka, dados em PostgreSQL (leads) e MongoDB (catálogo).
+Gerenciador de leads com sugestões automáticas e notificações.
+Arquitetura hexagonal · Spring Boot · Kafka · Postgres (leads) · MongoDB (catálogo).
 
 Sumário
 
-Arquitetura (visão rápida)
-
-Tecnologias
+Visão geral
 
 Módulos (Maven)
 
-Pré-requisitos
+Stack & Pré-requisitos
 
-Infraestrutura (Docker Compose)
+Infra (Docker Compose)
 
-Configuração por serviço (application.properties)
+Configuração por serviço
+
+Lead Service (8080)
+
+Catalog Service (8082)
+
+Notification Service (8081)
+
+Ingestion Gateway (8083)
 
 Build & Run
 
-Fluxo de eventos (Kafka)
+Endpoints principais
 
-API (endpoints principais)
+Eventos (Kafka)
 
-Modelo de dados (lead + tags)
-
-Testes (opcional)
+Modelo de dados (Postgres)
 
 Troubleshooting
 
-Roadmap
+Roadmap curto
 
-Arquitetura (visão rápida)
+Appendix A — Criação de tópicos Kafka via Spring
 
-Hexagonal por serviço (ports & adapters):
+Visão geral
+
+Fluxo: ingestion-gateway → lead-service → (Kafka) → catalog-service → lead-service → notification-service
+Eventos: lead.created (novo lead) · lead.updated (mudanças/sugestões)
+
+Arquitetura por serviço (hexagonal):
 
 com.anysale.<service>
-├─ domain/               # regras e modelos de domínio
-├─ application/          # casos de uso (opcional, pode crescer aqui)
+├─ domain/            # regras e modelos de domínio
+├─ application/       # casos de uso
 ├─ adapters/
-│   ├─ in/               # REST, Messaging (Kafka)
-│   └─ out/              # Persistence (JPA/Mongo), HTTP (WebClient), Messaging (Kafka)
-└─ config/               # beans infra (tópicos Kafka, etc.)
-
-
-Mensageria:
-
-lead.created → publicado pelo lead-service, consumido pelo catalog-service
-
-lead.updated → publicado pelo lead-service, consumido pelo notification-service
-
-Tecnologias
-
-Java 17, Maven 3.9+, Spring Boot 3.5.4
-
-Spring Web (MVC), Spring WebFlux/WebClient (gateway / chamadas internas)
-
-Spring Data JPA (PostgreSQL), Spring Data MongoDB (catálogo)
-
-Apache Kafka (spring-kafka), Resilience4j (retry/circuit breaker) onde aplicável
-
-Flyway (migrations DB), Actuator, Jakarta Validation
-
-Lombok (DTOs simples, menos boilerplate)
+│   ├─ in/            # REST, Messaging (Kafka)
+│   └─ out/           # Persistence (JPA/Mongo), HTTP (WebClient), Messaging (Kafka)
+└─ config/            # beans infra (tópicos Kafka, etc.)
 
 Módulos (Maven)
+anysale-parent/                 # parent (packaging=pom)
+├─ infra/docker-compose.yml   # Postgres, Mongo, Kafka
+├─ anysale-shared-kernel/     # VOs/util (sem Spring)
+├─ anysale-contracts/         # DTOs de eventos (Kafka) compartilhados
+├─ anysale-lead-service/      # JPA/Postgres + produz eventos
+├─ anysale-catalog-service/   # Mongo + consome lead.created + sugere
+├─ anysale-notification-service/ # consome lead.updated + histórico
+└─ anysale-ingestion-gateway/ # WebFlux → proxy/normalizador de leads
 
-anysale-parent (pom) – agregador/parent, Java 17, Boot 3.5.4, versões/plugins; lista os <modules>.
+Stack & Pré-requisitos
 
-anysale-shared-kernel (jar) – VOs/util (ex.: Email, Phone, Result, DomainException). Sem Spring.
+Java 17, Maven 3.9+, Docker + Docker Compose
 
-anysale-contracts (jar) – DTOs de eventos Kafka (ex.: LeadCreated, LeadUpdated) e DTOs compartilhados. Sem Spring.
+Spring Boot 3.5.x · Web/MVC · WebFlux (gateway) · Data JPA/Mongo · Kafka · Flyway · Actuator
 
-anysale-lead-service (jar) – CRUD de Lead/Suggestion via JPA + PostgreSQL; produz eventos lead.created e lead.updated.
+IntelliJ IDEA (habilite Lombok)
 
-anysale-catalog-service (jar) – MongoDB para produtos; consome lead.created, calcula top3 e chama PATCH no lead-service.
+Infra (Docker Compose)
 
-anysale-notification-service (jar) – consome lead.updated e expõe endpoint de histórico (simulado in-memory).
-
-anysale-ingestion-gateway (jar) – WebFlux: recebe payload bruto (/v1/ingest/lead) e repassa pro lead-service via HTTP; pode usar Resilience4j.
-
-Estrutura do repo:
-
-<repo-raiz>/
-├─ pom.xml                          # parent (packaging=pom)
-├─ infra/
-│  └─ docker-compose.yml            # Postgres, Mongo, Kafka/ZooKeeper
-├─ anysale-shared-kernel/
-├─ anysale-contracts/
-├─ anysale-lead-service/
-├─ anysale-catalog-service/
-├─ anysale-notification-service/
-└─ anysale-ingestion-gateway/
-
-Pré-requisitos
-
-JDK 17 (java -version)
-
-Maven 3.9+ (mvn -v)
-
-Docker + Docker Compose
-
-IntelliJ IDEA (recomendado) + plugin Lombok habilitado
-
-Dica IntelliJ: Settings → Build Tools → Maven → JDK for importer = 17 e Runner = 17.
-
-Infraestrutura (Docker Compose)
-
-Arquivo: infra/docker-compose.yml (na raiz do repo)
-
-version: "3.9"
-services:
-postgres:
-image: postgres:16
-container_name: pg-anysale
-environment:
-POSTGRES_DB: anysale
-POSTGRES_USER: anysale
-POSTGRES_PASSWORD: secret
-ports: ["5432:5432"]
-volumes: ["pgdata:/var/lib/postgresql/data"]
-
-mongo:
-image: mongo:6
-container_name: mongo-anysale
-ports: ["27017:27017"]
-
-zookeeper:
-image: confluentinc/cp-zookeeper:7.6.1
-container_name: zk-anysale
-environment:
-ZOOKEEPER_CLIENT_PORT: 2181
-ports: ["2181:2181"]
-
-kafka:
-image: confluentinc/cp-kafka:7.6.1
-container_name: kafka-anysale
-depends_on: [zookeeper]
-ports: ["9092:9092"]
-environment:
-KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-volumes:
-pgdata:
-
-
-Subir a infra:
+Arquivo: infra/docker-compose.yml
+Subir:
 
 docker compose -f infra/docker-compose.yml up -d
 
 
-Ver logs do Kafka (opcional):
+Resumo dos serviços:
 
-docker logs -f kafka-anysale
+Postgres 16 (localhost:5432, db/user/pass anysale / anysale / secret)
 
-Configuração por serviço (application.properties)
+Mongo 6 (localhost:27017, sem auth no dev)
+
+Kafka 7.6.x (localhost:9092, auto-create de tópicos habilitado no dev)
+
+Configuração por serviço
+
+Dica: se rodar app em container, troque localhost pelos nomes de serviço do compose
+(pg-anysale, mongo-anysale, kafka-anysale).
+
+Lead Service (8080)
+
 anysale-lead-service/src/main/resources/application.properties
+
 server.port=8080
 spring.datasource.url=jdbc:postgresql://localhost:5432/anysale
 spring.datasource.username=anysale
@@ -168,194 +104,478 @@ spring.jpa.hibernate.ddl-auto=validate
 spring.flyway.enabled=true
 
 spring.kafka.bootstrap-servers=localhost:9092
+# Producer JSON
 spring.kafka.producer.key-serializer=org.apache.kafka.common.serialization.StringSerializer
 spring.kafka.producer.value-serializer=org.springframework.kafka.support.serializer.JsonSerializer
+spring.kafka.producer.properties.spring.json.add.type.headers=true
+
+# (se o serviço consumir algo)
 spring.kafka.consumer.group-id=lead-service
-spring.kafka.consumer.auto-offset-reset=earliest
+spring.kafka.consumer.auto-offset-reset=latest
+spring.kafka.consumer.key-deserializer=org.apache.kafka.common.serialization.StringDeserializer
 spring.kafka.consumer.value-deserializer=org.springframework.kafka.support.serializer.JsonDeserializer
-spring.kafka.consumer.properties.spring.json.trusted.packages=com.anysale.*
-spring.kafka.properties.spring.json.add.type.headers=true
+spring.kafka.consumer.properties.spring.json.trusted.packages=com.anysale.contracts.events
 
 management.endpoints.web.exposure.include=health,info,metrics
 
+Catalog Service (8082)
+
 anysale-catalog-service/src/main/resources/application.properties
+
 server.port=8082
 spring.data.mongodb.uri=mongodb://localhost:27017/anysale
 
 spring.kafka.bootstrap-servers=localhost:9092
 spring.kafka.consumer.group-id=catalog-service
-spring.kafka.consumer.auto-offset-reset=earliest
+spring.kafka.consumer.auto-offset-reset=latest
+spring.kafka.consumer.key-deserializer=org.apache.kafka.common.serialization.StringDeserializer
 spring.kafka.consumer.value-deserializer=org.springframework.kafka.support.serializer.JsonDeserializer
-spring.kafka.consumer.properties.spring.json.trusted.packages=com.anysale.*
+spring.kafka.consumer.properties.spring.json.trusted.packages=com.anysale.contracts.events
 
 lead-service.base-url=http://localhost:8080
+
 management.endpoints.web.exposure.include=health,info
+management.endpoint.health.show-details=always
+
+Notification Service (8081)
 
 anysale-notification-service/src/main/resources/application.properties
+
 server.port=8081
 spring.kafka.bootstrap-servers=localhost:9092
 spring.kafka.consumer.group-id=notification-service
-spring.kafka.consumer.auto-offset-reset=earliest
+spring.kafka.consumer.auto-offset-reset=latest
+spring.kafka.consumer.key-deserializer=org.apache.kafka.common.serialization.StringDeserializer
 spring.kafka.consumer.value-deserializer=org.springframework.kafka.support.serializer.JsonDeserializer
-spring.kafka.consumer.properties.spring.json.trusted.packages=com.anysale.*
+spring.kafka.consumer.properties.spring.json.trusted.packages=com.anysale.contracts.events
+
 management.endpoints.web.exposure.include=health,info
+
+Ingestion Gateway (8083)
 
 anysale-ingestion-gateway/src/main/resources/application.properties
+
 server.port=8083
 lead-service.base-url=http://localhost:8080
-
-# se usar Resilience4j (@Retry/@CircuitBreaker) no gateway:
-resilience4j.retry.instances.leadClient.max-attempts=3
-resilience4j.retry.instances.leadClient.wait-duration=300ms
-resilience4j.circuitbreaker.instances.leadClient.sliding-window-size=10
-resilience4j.circuitbreaker.instances.leadClient.failure-rate-threshold=50
-
 management.endpoints.web.exposure.include=health,info
 
-
-Override por variável de ambiente: qualquer propriedade pode ser sobrescrita (ex.: SPRING_DATASOURCE_URL).
-
 Build & Run
-# 0) subir infra
+# 0) infraestrutura
 docker compose -f infra/docker-compose.yml up -d
 
 # 1) build (raiz do repo)
 mvn -U -T 1C clean package
 
-# 2) subir serviços (cada um em um terminal/Run do IntelliJ)
+# 2) subir serviços (cada um em um terminal ou pela IDE)
 mvn -f anysale-lead-service spring-boot:run
 mvn -f anysale-catalog-service spring-boot:run
 mvn -f anysale-notification-service spring-boot:run
 mvn -f anysale-ingestion-gateway spring-boot:run
 
-# health checks
+# 3) health checks
 curl http://localhost:8080/actuator/health
 curl http://localhost:8081/actuator/health
 curl http://localhost:8082/actuator/health
 curl http://localhost:8083/actuator/health
 
-Fluxo de eventos (Kafka)
+Endpoints principais
 
-Gateway recebe lead bruto e chama Lead Service (POST /v1/leads).
-
-Lead Service cria o lead e publica lead.created.
-
-Catalog Service consome lead.created, escolhe top3 produtos e chama PATCH /v1/leads/{id}/suggestions.
-
-Lead Service anexa sugestões e publica lead.updated.
-
-Notification Service consome lead.updated e registra/expõe o histórico.
-
-Tópicos:
-
-lead.created (produzido pelo lead-service; consumido pelo catalog-service)
-
-lead.updated (produzido pelo lead-service; consumido pelo notification-service)
-
-Dica: crie os tópicos via @Bean NewTopic (já incluso no lead-service) para não depender de auto-create em produção.
-
-API (endpoints principais)
 Lead Service (8080)
 
 POST /v1/leads
-Cria um lead e publica lead.created.
-Body:
 
 {
-"name": "João",
-"email": "joao@ex.com",
-"phone": "+55...",
-"source": "MarketplaceX",
-"desiredCategory": "home-office",
-"desiredTags": ["cadeira", "ergonômica"]
+"name":"João","email":"joao@ex.com","phone":"+55...",
+"source":"MarketplaceX","desiredCategory":"home-office",
+"desiredTags":["cadeira","ergonômica"]
 }
 
 
-200 OK (JSON do lead)
-
-PATCH /v1/leads/{id}/stage
-Muda estágio; publica lead.updated.
-Body: {"stage":"WON"}
+PATCH /v1/leads/{id}/stage → {"stage":"WON"}
 
 PATCH /v1/leads/{id}/suggestions
-Anexa sugestões; publica lead.updated.
-Body:
 
-{
-"suggestions": [
-{"productId":"p1","title":"Cadeira Ergo A","price":520,"currency":"BRL","vendor":"LojaX"},
-{"productId":"p2","title":"Mesa B","price":399,"currency":"BRL","vendor":"LojaX"}
-]
-}
+{ "suggestions":[
+{"productId":"p1","title":"Cadeira Ergo A","price":520,"currency":"BRL","vendor":"LojaX"}
+]}
 
 
 GET /v1/leads/{id}
-Retorna o lead.
 
 Catalog Service (8082)
 
-POST /v1/products (seed/bulk)
-
-GET /v1/products
+POST /v1/products (seed) · GET /v1/products
 
 Notification Service (8081)
 
 GET /v1/notifications/{leadId}
-Lista histórico de notificações (em memória).
 
 Ingestion Gateway (8083)
 
-POST /v1/ingest/lead
-Recebe lead bruto (campos como full_name, desired_category, etc.) e repassa ao Lead Service.
+POST /v1/ingest/lead (payload bruto → normalizado e enviado ao Lead Service)
 
-Modelo de dados (lead + tags)
+Eventos (Kafka)
 
-Tabela lead: dados principais (id, nome, email, stage, etc.).
+lead.created — produzido pelo lead-service, consumido pelo catalog-service
 
-Tabela lead_desired_tag: uma linha por tag do lead (lead_id, tag) via @ElementCollection.
+lead.updated — produzido pelo lead-service, consumido pelo notification-service
 
-Tabela lead_suggestion: sugestões anexadas.
+Contratos (módulo anysale-contracts)
 
-Flyway V1 já cria tudo; arquivo:
-anysale-lead-service/src/main/resources/db/migration/V1__init.sql
+com.anysale.contracts.events.LeadCreatedEvent
 
-Testes (opcional)
+com.anysale.contracts.events.LeadUpdatedEvent
 
-Testcontainers para Postgres/Mongo/Kafka em integração.
+Modelo de dados (Postgres)
 
-Para começar rápido, você pode:
+lead: id UUID PK, name, email, phone, source, desired_category, desired_tags TEXT[], stage, created_at, updated_at
 
-Desativar o teste gerado do Initializr ou
+lead_suggestion: id, lead_id FK, product_id, title, price, currency, vendor, created_at
 
-Usar mvn -DskipTests clean package durante o bootstrap.
-
-Se quiser, adiciono um exemplo de teste de contexto com Postgres via Testcontainers.
+Migrations via Flyway: anysale-lead-service/src/main/resources/db/migration/V1__init.sql
 
 Troubleshooting
 
-“Dependency requires at least JVM 17 / This build uses a Java 11 JVM”
-Troque o JAVA_HOME, IntelliJ Importer/Runner e mvn -v para Java 17.
+Kafka deserialização (ClassNotFound)
+Garanta spring.kafka.*.trusted.packages=com.anysale.contracts.events em todos os consumidores e que os produtores enviem DTOs do módulo contracts.
+Se já houver mensagens antigas incompatíveis, troque o group-id ou limpe o tópico.
 
-Parent não encontra módulo / “Cannot resolve symbol <module>”
-Garanta <modules> corretos, pastas sob o parent, packaging=pom no parent e jar nos filhos. Recarregue o Maven na IDE.
+Transaction synchronization is not active
+Use @org.springframework.transaction.annotation.Transactional (Spring) e publique eventos após o commit (ou adote Outbox).
 
-Falha ao subir DB/Kafka
-Verifique docker compose -f infra/docker-compose.yml up -d, portas livres, e URLs em application.properties.
+Mongo/DB “connection refused”
+App em container deve usar mongo-anysale / pg-anysale (não localhost).
 
-Kafka bootstrap
-Logs do container (docker logs -f kafka-anysale). Para host/IDE, KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092.
+Flyway checksum mismatch
+Não edite migrations aplicadas. Crie uma nova V2__. Para ambiente local, flyway repair pode ser usado conscientemente.
 
-Erro JPA: 'Basic' attribute type should not be 'String[]'
-Resolvido usando @ElementCollection List<String> em vez de String[].
+Roadmap curto
 
-Roadmap
+Outbox para publicação idempotente
 
-Outbox/CDC para publicação idempotente
+Persistir notificações (Postgres)
 
-Autenticação/autorização (API Key no gateway)
+Autenticação/RBAC + multi-tenant
 
-Observabilidade (Prometheus/Grafana, OpenTelemetry)
+Observabilidade (Prometheus/Grafana/OTel)
 
-Notificadores reais (e-mail/SMS) + DLQ/retentativas
+Conectores (Facebook Lead Ads / Shopify / Woo)
 
-Estratégias de ranking de catálogo mais sofisticadas
+Appendix A — Criação de tópicos Kafka via Spring
+
+Crie esta classe no Lead Service para garantir os tópicos no start:
+
+anysale-lead-service/src/main/java/com/anysale/lead/config/KafkaTopicsConfig.java
+
+package com.anysale.lead.config;
+
+import org.apache.kafka.clients.admin.NewTopic;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.config.TopicBuilder;
+
+/**
+* Cria tópicos necessários no ambiente de dev.
+* Em produção, prefira provisionar via IaC/DevOps.
+  */
+  @Configuration
+  public class KafkaTopicsConfig {
+
+  @Bean
+  public NewTopic leadCreated() {
+  return TopicBuilder.name("lead.created")
+  .partitions(3)
+  .replicas(1)
+  .build();
+  }
+
+  @Bean
+  public NewTopic leadUpdated() {
+  return TopicBuilder.name("lead.updated")
+  .partitions(3)
+  .replicas(1)
+  .build();
+  }
+  }
+
+
+Se auto-create estiver desabilitado no broker, esses beans garantem os tópicos.
+Para ambientes prod, use IaC (Terraform/Helm/Confluent).
+
+Pronto! Se quiser, eu também te mando um README.pt-BR.md com esses mesmos conteúdos + um micro badge de status de build do Maven/GitHub Actions.
+
+Você disse:
+quero
+O ChatGPT disse:
+Pensou por 8s
+
+perfeito! abaixo está o README.pt-BR.md prontinho (com TOC e badges).
+Substitua seu-usuario/seu-repo no badge do GitHub Actions pelo nome do seu repositório.
+
+# AnySale
+
+Gerenciador de **leads** com **sugestões automáticas** e **notificações**.  
+Arquitetura Hexagonal · Spring Boot · Kafka · Postgres (leads) · MongoDB (catálogo).
+
+[![Build](https://github.com/seu-usuario/seu-repo/actions/workflows/ci.yml/badge.svg)](https://github.com/seu-usuario/seu-repo/actions/workflows/ci.yml)
+![Java](https://img.shields.io/badge/Java-17-blue)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.x-brightgreen)
+![License](https://img.shields.io/badge/License-MIT-lightgrey)
+
+---
+
+## Sumário
+- [Visão geral](#visão-geral)
+- [Módulos (Maven)](#módulos-maven)
+- [Stack & Pré-requisitos](#stack--pré-requisitos)
+- [Infra (Docker Compose)](#infra-docker-compose)
+- [Configuração por serviço](#configuração-por-serviço)
+    - [Lead Service (8080)](#lead-service-8080)
+    - [Catalog Service (8082)](#catalog-service-8082)
+    - [Notification Service (8081)](#notification-service-8081)
+    - [Ingestion Gateway (8083)](#ingestion-gateway-8083)
+- [Build & Run](#build--run)
+- [Endpoints principais](#endpoints-principais)
+- [Eventos (Kafka)](#eventos-kafka)
+- [Modelo de dados (Postgres)](#modelo-de-dados-postgres)
+- [Troubleshooting](#troubleshooting)
+- [Roadmap curto](#roadmap-curto)
+- [Apêndice A — Tópicos Kafka via Spring](#apêndice-a--tópicos-kafka-via-spring)
+
+---
+
+## Visão geral
+
+Fluxo: `ingestion-gateway → lead-service → (Kafka) → catalog-service → lead-service → notification-service`  
+Eventos: `lead.created` (novo lead) · `lead.updated` (mudanças/sugestões)
+
+Arquitetura por serviço (**hexagonal**):
+
+
+com.anysale.<service>
+├─ domain/ # regras e modelos de domínio
+├─ application/ # casos de uso
+├─ adapters/
+│ ├─ in/ # REST, Messaging (Kafka)
+│ └─ out/ # Persistence (JPA/Mongo), HTTP (WebClient), Messaging (Kafka)
+└─ config/ # beans infra (tópicos Kafka, etc.)
+
+
+---
+
+## Módulos (Maven)
+
+
+
+anysale-parent/ # parent (packaging=pom)
+├─ infra/docker-compose.yml # Postgres, Mongo, Kafka
+├─ anysale-shared-kernel/ # VOs/util (sem Spring)
+├─ anysale-contracts/ # DTOs de eventos (Kafka) compartilhados
+├─ anysale-lead-service/ # JPA/Postgres + produz eventos
+├─ anysale-catalog-service/ # Mongo + consome lead.created + sugere
+├─ anysale-notification-service/ # consome lead.updated + histórico
+└─ anysale-ingestion-gateway/ # WebFlux → proxy/normalizador de leads
+
+
+---
+
+## Stack & Pré-requisitos
+
+- **Java 17**, **Maven 3.9+**, **Docker** + Docker Compose
+- Spring Boot 3.5.x · Web/MVC · WebFlux (gateway) · Data JPA/Mongo · Kafka · Flyway · Actuator
+- IntelliJ IDEA (habilite Lombok)
+
+---
+
+## Infra (Docker Compose)
+
+Arquivo: `infra/docker-compose.yml`
+
+Subir:
+```bash
+docker compose -f infra/docker-compose.yml up -d
+
+
+Serviços (dev):
+
+Postgres 16 (localhost:5432, db/user/pass anysale / anysale / secret)
+
+Mongo 6 (localhost:27017, sem auth no dev)
+
+Kafka 7.6.x (localhost:9092, auto-create de tópicos habilitado no dev)
+
+Configuração por serviço
+
+Dica: se rodar app em container, troque localhost pelos nomes de serviço do compose
+(pg-anysale, mongo-anysale, kafka-anysale).
+
+Lead Service (8080)
+
+anysale-lead-service/src/main/resources/application.properties
+
+server.port=8080
+spring.datasource.url=jdbc:postgresql://localhost:5432/anysale
+spring.datasource.username=anysale
+spring.datasource.password=secret
+spring.jpa.open-in-view=false
+spring.jpa.hibernate.ddl-auto=validate
+spring.flyway.enabled=true
+
+spring.kafka.bootstrap-servers=localhost:9092
+# Producer JSON
+spring.kafka.producer.key-serializer=org.apache.kafka.common.serialization.StringSerializer
+spring.kafka.producer.value-serializer=org.springframework.kafka.support.serializer.JsonSerializer
+spring.kafka.producer.properties.spring.json.add.type.headers=true
+
+# (se o serviço também consumir)
+spring.kafka.consumer.group-id=lead-service
+spring.kafka.consumer.auto-offset-reset=latest
+spring.kafka.consumer.key-deserializer=org.apache.kafka.common.serialization.StringDeserializer
+spring.kafka.consumer.value-deserializer=org.springframework.kafka.support.serializer.JsonDeserializer
+spring.kafka.consumer.properties.spring.json.trusted.packages=com.anysale.contracts.events
+
+management.endpoints.web.exposure.include=health,info,metrics
+
+Catalog Service (8082)
+
+anysale-catalog-service/src/main/resources/application.properties
+
+server.port=8082
+spring.data.mongodb.uri=mongodb://localhost:27017/anysale
+
+spring.kafka.bootstrap-servers=localhost:9092
+spring.kafka.consumer.group-id=catalog-service
+spring.kafka.consumer.auto-offset-reset=latest
+spring.kafka.consumer.key-deserializer=org.apache.kafka.common.serialization.StringDeserializer
+spring.kafka.consumer.value-deserializer=org.springframework.kafka.support.serializer.JsonDeserializer
+spring.kafka.consumer.properties.spring.json.trusted.packages=com.anysale.contracts.events
+
+lead-service.base-url=http://localhost:8080
+
+management.endpoints.web.exposure.include=health,info
+management.endpoint.health.show-details=always
+
+Notification Service (8081)
+
+anysale-notification-service/src/main/resources/application.properties
+
+server.port=8081
+spring.kafka.bootstrap-servers=localhost:9092
+spring.kafka.consumer.group-id=notification-service
+spring.kafka.consumer.auto-offset-reset=latest
+spring.kafka.consumer.key-deserializer=org.apache.kafka.common.serialization.StringDeserializer
+spring.kafka.consumer.value-deserializer=org.springframework.kafka.support.serializer.JsonDeserializer
+spring.kafka.consumer.properties.spring.json.trusted.packages=com.anysale.contracts.events
+
+management.endpoints.web.exposure.include=health,info
+
+Ingestion Gateway (8083)
+
+anysale-ingestion-gateway/src/main/resources/application.properties
+
+server.port=8083
+lead-service.base-url=http://localhost:8080
+management.endpoints.web.exposure.include=health,info
+
+Build & Run
+# 0) infraestrutura
+docker compose -f infra/docker-compose.yml up -d
+
+# 1) build (raiz)
+mvn -U -T 1C clean package
+
+# 2) subir serviços (cada um em um terminal/IDE)
+mvn -f anysale-lead-service spring-boot:run
+mvn -f anysale-catalog-service spring-boot:run
+mvn -f anysale-notification-service spring-boot:run
+mvn -f anysale-ingestion-gateway spring-boot:run
+
+# 3) health checks
+curl http://localhost:8080/actuator/health
+curl http://localhost:8081/actuator/health
+curl http://localhost:8082/actuator/health
+curl http://localhost:8083/actuator/health
+
+Endpoints principais
+
+Lead Service (8080)
+
+POST /v1/leads
+
+{
+  "name":"João","email":"joao@ex.com","phone":"+55...",
+  "source":"MarketplaceX","desiredCategory":"home-office",
+  "desiredTags":["cadeira","ergonômica"]
+}
+
+
+PATCH /v1/leads/{id}/stage → {"stage":"WON"}
+
+PATCH /v1/leads/{id}/suggestions
+
+{ "suggestions":[
+  {"productId":"p1","title":"Cadeira Ergo A","price":520,"currency":"BRL","vendor":"LojaX"}
+]}
+
+
+GET /v1/leads/{id}
+
+Catalog Service (8082)
+
+POST /v1/products (seed) · GET /v1/products
+
+Notification Service (8081)
+
+GET /v1/notifications/{leadId}
+
+Ingestion Gateway (8083)
+
+POST /v1/ingest/lead (payload bruto → normalizado e enviado ao Lead Service)
+
+Eventos (Kafka)
+
+lead.created — produzido pelo lead-service, consumido pelo catalog-service
+
+lead.updated — produzido pelo lead-service, consumido pelo notification-service
+
+Contratos (módulo anysale-contracts)
+
+com.anysale.contracts.events.LeadCreatedEvent
+
+com.anysale.contracts.events.LeadUpdatedEvent
+
+Modelo de dados (Postgres)
+
+lead: id UUID PK, name, email, phone, source,
+desired_category, desired_tags TEXT[], stage, created_at, updated_at
+
+lead_suggestion: id, lead_id FK, product_id, title, price, currency, vendor, created_at
+
+Migrations via Flyway: anysale-lead-service/src/main/resources/db/migration/V1__init.sql
+
+Troubleshooting
+
+Kafka deserialização (ClassNotFound)
+Garanta spring.kafka.*.trusted.packages=com.anysale.contracts.events em todos os consumidores e que os produtores enviem DTOs do módulo contracts.
+Se já houver mensagens antigas incompatíveis, troque o group-id ou limpe o tópico.
+
+Transaction synchronization is not active
+Use @org.springframework.transaction.annotation.Transactional (Spring) e publique eventos após o commit (ou adote Outbox).
+
+Mongo/DB “connection refused”
+App em container deve usar mongo-anysale / pg-anysale (não localhost).
+
+Flyway checksum mismatch
+Não edite migrations aplicadas. Crie uma nova V2__. Em dev, flyway repair pode ser usado conscientemente.
+
+Roadmap curto
+
+Outbox para publicação idempotente
+
+Persistir notificações (Postgres)
+
+Autenticação/RBAC + multi-tenant
+
+Observabilidade (Prometheus/Grafana/OTel)
+
+Conectores (Facebook Lead Ads / Shopify / Woo)
