@@ -1,0 +1,294 @@
+{
+	"info": {
+		"_postman_id": "377689cf-8b1c-4766-a767-bda931faf719",
+		"name": "AnySale (Local)",
+		"description": "Coleção de requests corrigida com URLs explícitas por serviço.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json",
+		"_exporter_id": "695470",
+		"_collection_link": "https://lively-moon-576969.postman.co/workspace/tradeflow_wksp~04fd0a34-157c-4911-a293-ab7a84800f0a/collection/695470-377689cf-8b1c-4766-a767-bda931faf719?action=share&source=collection_link&creator=695470"
+	},
+	"item": [
+		{
+			"name": "Health",
+			"item": [
+				{
+					"name": "Lead Health",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.response.to.have.status(200);"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "http://localhost:8080/actuator/health"
+					},
+					"response": []
+				},
+				{
+					"name": "Catalog Health",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.response.to.have.status(200);"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Notification Health",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.response.to.have.status(200);"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Gateway Health",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.response.to.have.status(200);"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": ""
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Catalog",
+			"item": [
+				{
+					"name": "Seed Products",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.response.to.have.status(200);",
+									"pm.expect(pm.response.json()).to.be.an('array');"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "[\n  {\n    \"title\": \"Cadeira Ergo A\",\n    \"category\": \"home-office\",\n    \"price\": 520,\n    \"currency\": \"BRL\",\n    \"tags\": [\n      \"cadeira\",\n      \"ergonômica\"\n    ],\n    \"vendor\": \"LojaX\",\n    \"available\": true\n  },\n  {\n    \"title\": \"Mesa Compacta B\",\n    \"category\": \"home-office\",\n    \"price\": 399,\n    \"currency\": \"BRL\",\n    \"tags\": [\n      \"mesa\"\n    ],\n    \"vendor\": \"LojaX\",\n    \"available\": true\n  },\n  {\n    \"title\": \"Cadeira Gamer C\",\n    \"category\": \"home-office\",\n    \"price\": 650,\n    \"currency\": \"BRL\",\n    \"tags\": [\n      \"cadeira\",\n      \"gamer\"\n    ],\n    \"vendor\": \"LojaY\",\n    \"available\": true\n  }\n]"
+						},
+						"url": ""
+					},
+					"response": []
+				},
+				{
+					"name": "List Products",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.response.to.have.status(200);"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": ""
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Leads",
+			"item": [
+				{
+					"name": "Create Lead",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+									"const json = pm.response.json();",
+									"pm.expect(json.id, \"tem id\").to.exist;",
+									"pm.environment.set(\"leadId\", json.id); // salva no Environment selecionado",
+									"console.log(\"leadId =\", json.id);"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"João Silva\",\n  \"email\": \"joao@ex.com\",\n  \"phone\": \"+5541998767971\",\n  \"source\": \"MarketplaceX\",\n  \"desiredCategory\": \"home-office\",\n  \"desiredTags\": [\"cadeira\",\"ergonômica\"]\n}"
+						},
+						"url": "http://localhost:8080/v1/leads"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Lead via Gateway",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.response.to.have.status(200);",
+									"var json = pm.response.json();",
+									"if (json && json.id) { pm.environment.set(\"LEAD_ID\", json.id); }",
+									"pm.test(\"Captured LEAD_ID\", function(){ pm.expect(pm.environment.get(\"LEAD_ID\")).to.exist; });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"full_name\": \"João Silva\",\n  \"email\": \"joao@ex.com\",\n  \"phone\": \"+55...\",\n  \"source\": \"MarketplaceX\",\n  \"desired_category\": \"home-office\",\n  \"desired_tags\": [\n    \"cadeira\",\n    \"ergonômica\"\n  ],\n  \"preferences\": {\n    \"budget\": 600\n  }\n}"
+						},
+						"url": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Get Lead by ID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.response.to.have.status(200);"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Change Lead Stage → WON",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.response.to.have.status(200);"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"stage\": \"WON\"\n}"
+						},
+						"url": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Get Notifications for Lead",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.response.to.have.status(200);",
+									"console.log('Notifications:', pm.response.json());"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": ""
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}
