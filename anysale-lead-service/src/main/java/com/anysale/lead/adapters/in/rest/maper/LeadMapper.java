@@ -1,6 +1,7 @@
 package com.anysale.lead.adapters.in.rest.maper;
 
 import com.anysale.lead.adapters.in.rest.dto.LeadResponseDto;
+import com.anysale.lead.adapters.in.rest.dto.LeadSuggestionDto;
 import com.anysale.lead.adapters.in.rest.dto.SuggestionItemDto;
 import com.anysale.lead.adapters.in.rest.dto.SuggestionPatchRequestDto;
 import com.anysale.lead.domain.model.Lead;
@@ -38,5 +39,18 @@ public final class LeadMapper {
             out.add(s);
         }
         return out;
+    }
+
+    public static LeadSuggestionDto toSuggestionDto(LeadSuggestion s) {
+        if (s == null) return null;
+        return LeadSuggestionDto.builder()
+                .id(s.getId())
+                .productId(s.getProductId())
+                .title(s.getTitle())
+                .price(s.getPrice())
+                .currency(s.getCurrency())
+                .vendor(s.getVendor())
+                .createdAt(s.getCreatedAt())
+                .build();
     }
 }
