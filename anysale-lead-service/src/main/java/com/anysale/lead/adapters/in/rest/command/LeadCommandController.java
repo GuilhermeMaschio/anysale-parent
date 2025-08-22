@@ -4,6 +4,7 @@ import com.anysale.lead.adapters.in.rest.dto.*;
 import com.anysale.lead.adapters.in.rest.maper.LeadMapper;
 import com.anysale.lead.aplication.LeadService; // seu service atual
 import com.anysale.lead.domain.model.Lead;
+import com.anysale.lead.idempotency.Idempotent;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,13 +20,34 @@ public class LeadCommandController {
     private final LeadService service;
     public LeadCommandController(LeadService service) { this.service = service; }
 
+    /**
+     * Idempotente via header Idempotency-Key (ver Interceptor/Advice).
+     * - Primeira chamada: cria o Lead, retorna 201 com Location e ETag.
+     * - Repetição com a MESMA key e MESMO body: retorna a MESMA resposta (short-circuit).
+     * - Repetição com a MESMA key e body DIFERENTE: 409 Conflict (configurado no interceptor).
+     */
+    @Idempotent(operation = "LEAD_CREATE", ttlSeconds = 86_400)
     @PostMapping
     public ResponseEntity<LeadResponseDto> create(@Valid @RequestBody LeadCreateRequestDto req) {
         Lead saved = service.createLead(
                 req.getName(), req.getEmail(), req.getPhone(),
                 req.getSource(), req.getDesiredCategory(), req.getDesiredTags()
         );
-        return ResponseEntity.ok(LeadMapper.toResponse(saved));
+
+        LeadResponseDto body = LeadMapper.toResponse(saved);
+
+        URI self = ServletUriComponentsBuilder
+                .fromCurrentRequestUri()
+                .path("/{id}")
+                .buildAndExpand(saved.getId())
+                .toUri();
+
+        String etag = (saved.getUpdatedAt() != null)
+                ? ("\"" + saved.getUpdatedAt().toEpochMilli() + "\"")
+                : ("\"" + saved.getId().toString() + "\"");
+        return ResponseEntity.created(self)
+                .eTag(etag)
+                .body(body);
     }
 
     @PatchMapping("/{id}/stage")
@@ -48,6 +70,7 @@ public class LeadCommandController {
                 .body(body);
     }
 
+    @Idempotent(operation = "LEAD_SUGGESTIONS_PATCH", resourceIdParam = "id", ttlSeconds = 86400)
     @PatchMapping("/{id}/suggestions")
     public ResponseEntity<BulkApplyResponseDto> attachSuggestions(
             @PathVariable UUID id,

@@ -18,8 +18,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -176,7 +174,6 @@ public class LeadService {
     private boolean isBlank(String s) { return s == null || s.isBlank(); }
 
     private void publishAfterCommitOrNow(Runnable r) {
-        // implemente conforme seu helper atual; se já tiver, remova este stub
         r.run();
     }
 
