@@ -45,7 +45,7 @@ public class LeadService {
         Lead lead = new Lead();
         lead.setName(name);
         lead.setEmail(email);
-        lead.setPhone(phone);
+        lead.setPhone(normalizePhone(phone));
         lead.setSource(source);
         lead.setDesiredCategory(desiredCategory);
         lead.setDesiredTags(desiredTags != null ? new ArrayList<>(desiredTags) : new ArrayList<>());
@@ -90,6 +90,15 @@ public class LeadService {
 
     private String normalize(String s) {
         return (s == null || s.isBlank()) ? null : s.trim();
+    }
+
+    private String normalizePhone(String phone) {
+        String trimmed = normalize(phone);
+        if (trimmed == null) {
+            return null;
+        }
+        String digitsOnly = trimmed.replaceAll("\\D", "");
+        return digitsOnly.isBlank() ? trimmed : digitsOnly;
     }
 
 

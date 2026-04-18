@@ -22,6 +22,12 @@ public class Lead {
 
     private String stage;
 
+    @Column(name = "last_message", length = 2000)
+    private String lastMessage;
+
+    @Column(name = "last_interaction_at")
+    private Instant lastInteractionAt;
+
     // coleção de tags em tabela própria
     @ElementCollection
     @CollectionTable(name = "lead_desired_tag", joinColumns = @JoinColumn(name = "lead_id"))
@@ -59,6 +65,10 @@ public class Lead {
     public void setDesiredCategory(String desiredCategory) { this.desiredCategory = desiredCategory; }
     public String getStage() { return stage; }
     public void setStage(String stage) { this.stage = stage; }
+    public String getLastMessage() { return lastMessage; }
+    public void setLastMessage(String lastMessage) { this.lastMessage = lastMessage; }
+    public Instant getLastInteractionAt() { return lastInteractionAt; }
+    public void setLastInteractionAt(Instant lastInteractionAt) { this.lastInteractionAt = lastInteractionAt; }
     public List<String> getDesiredTags() { return desiredTags; }
     public void setDesiredTags(List<String> desiredTags) { this.desiredTags = desiredTags; }
     public Instant getCreatedAt() { return createdAt; }
