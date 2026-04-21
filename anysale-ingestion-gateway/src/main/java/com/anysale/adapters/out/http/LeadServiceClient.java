@@ -1,6 +1,7 @@
 package com.anysale.adapters.out.http;
 
 import com.anysale.adapters.out.http.dto.CreateOrUpdateLeadRequest;
+import com.anysale.application.model.LeadSnapshot;
 import com.anysale.application.port.out.LeadGatewayPort;
 import com.anysale.domain.model.IncomingMessage;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +17,7 @@ public class LeadServiceClient implements LeadGatewayPort {
     private final WebClient leadServiceWebClient;
 
     @Override
-    public Mono<Void> createOrUpdateLeadFromIncomingMessage(IncomingMessage message) {
+    public Mono<LeadSnapshot> createOrUpdateLeadFromIncomingMessage(IncomingMessage message) {
         CreateOrUpdateLeadRequest request = new CreateOrUpdateLeadRequest(
                 message.getPhone(),
                 message.getLeadName(),
@@ -30,6 +31,6 @@ public class LeadServiceClient implements LeadGatewayPort {
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .retrieve()
-                .bodyToMono(Void.class);
+                .bodyToMono(LeadSnapshot.class);
     }
 }

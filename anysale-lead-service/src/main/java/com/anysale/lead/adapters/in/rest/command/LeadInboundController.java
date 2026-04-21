@@ -1,6 +1,7 @@
 package com.anysale.lead.adapters.in.rest.command;
 
 import com.anysale.lead.adapters.in.rest.dto.IncomingMessageRequest;
+import com.anysale.lead.adapters.in.rest.dto.LeadResponseDto;
 import com.anysale.lead.aplication.usecase.HandleIncomingMessageUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,8 +19,8 @@ public class LeadInboundController {
     private final HandleIncomingMessageUseCase handleIncomingMessageUseCase;
 
     @PostMapping("/incoming-message")
-    public ResponseEntity<Void> handle(@Valid @RequestBody IncomingMessageRequest request) {
-        handleIncomingMessageUseCase.execute(request);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<LeadResponseDto> handle(@Valid @RequestBody IncomingMessageRequest request) {
+        LeadResponseDto response = handleIncomingMessageUseCase.execute(request);
+        return ResponseEntity.ok(response);
     }
 }

@@ -1,6 +1,7 @@
 package com.anysale.lead.aplication.service;
 
 import com.anysale.lead.adapters.in.rest.dto.IncomingMessageRequest;
+import com.anysale.lead.adapters.in.rest.dto.LeadResponseDto;
 import com.anysale.lead.adapters.out.messaging.LeadEventPublisher;
 import com.anysale.lead.adapters.out.persistence.InteractionJpaRepository;
 import com.anysale.lead.adapters.out.persistence.LeadJpaRepository;
@@ -61,7 +62,7 @@ class LeadInboundServiceTest {
             return lead;
         });
 
-        service.execute(request);
+        LeadResponseDto response = service.execute(request);
 
         ArgumentCaptor<Lead> leadCaptor = ArgumentCaptor.forClass(Lead.class);
         verify(leadRepository).save(leadCaptor.capture());
@@ -72,6 +73,8 @@ class LeadInboundServiceTest {
         assertThat(savedLead.getStage()).isEqualTo("CONTACTED");
         assertThat(savedLead.getLastMessage()).isEqualTo("Quero saber mais");
         assertThat(savedLead.getLastInteractionAt()).isNotNull();
+        assertThat(response.getId()).isEqualTo(savedLead.getId());
+        assertThat(response.getStage()).isEqualTo("CONTACTED");
 
         ArgumentCaptor<Interaction> interactionCaptor = ArgumentCaptor.forClass(Interaction.class);
         verify(interactionRepository).save(interactionCaptor.capture());
@@ -105,13 +108,15 @@ class LeadInboundServiceTest {
         when(leadRepository.findAllByNormalizedPhone("41999999999")).thenReturn(List.of(existingLead));
         when(leadRepository.save(any(Lead.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        service.execute(request);
+        LeadResponseDto response = service.execute(request);
 
         verify(leadRepository).save(existingLead);
         assertThat(existingLead.getName()).isEqualTo("Lead Existente");
         assertThat(existingLead.getPhone()).isEqualTo("41999999999");
         assertThat(existingLead.getStage()).isEqualTo("CONTACTED");
         assertThat(existingLead.getLastMessage()).isEqualTo("Mensagem recebida");
+        assertThat(response.getId()).isEqualTo(existingLead.getId());
+        assertThat(response.getLastMessage()).isEqualTo("Mensagem recebida");
 
         verify(leadEventPublisher, never()).publishLeadCreated(any(Lead.class));
         verify(leadEventPublisher).publishLeadUpdated(existingLead, "INCOMING_MESSAGE_RECEIVED");
@@ -127,15 +132,21 @@ class LeadInboundServiceTest {
                 "msg-duplicada"
         );
 
+        Interaction interaction = new Interaction();
+        Lead lead = new Lead();
+        lead.setId(UUID.randomUUID());
+        lead.setName("Lead duplicado");
+        interaction.setLead(lead);
         when(interactionRepository.findByChannelAndExternalMessageId("WHATSAPP", "msg-duplicada"))
-                .thenReturn(Optional.of(new Interaction()));
+                .thenReturn(Optional.of(interaction));
 
-        service.execute(request);
+        LeadResponseDto response = service.execute(request);
 
         verify(leadRepository, never()).save(any(Lead.class));
         verify(interactionRepository, never()).save(any(Interaction.class));
         verify(leadEventPublisher, never()).publishLeadCreated(any(Lead.class));
         verify(leadEventPublisher, never()).publishLeadUpdated(any(Lead.class), eq("INCOMING_MESSAGE_RECEIVED"));
+        assertThat(response.getId()).isEqualTo(lead.getId());
     }
 
     @Test
@@ -151,10 +162,11 @@ class LeadInboundServiceTest {
         when(leadRepository.findAllByNormalizedPhone("41999999999")).thenReturn(List.of());
         when(leadRepository.save(any(Lead.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        service.execute(request);
+        LeadResponseDto response = service.execute(request);
 
         ArgumentCaptor<Lead> leadCaptor = ArgumentCaptor.forClass(Lead.class);
         verify(leadRepository).save(leadCaptor.capture());
         assertThat(leadCaptor.getValue().getName()).isEqualTo("Contato 41999999999");
+        assertThat(response.getName()).isEqualTo("Contato 41999999999");
     }
 }

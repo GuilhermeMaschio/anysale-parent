@@ -1,6 +1,8 @@
 package com.anysale.lead.aplication.service;
 
 import com.anysale.lead.adapters.in.rest.dto.IncomingMessageRequest;
+import com.anysale.lead.adapters.in.rest.dto.LeadResponseDto;
+import com.anysale.lead.adapters.in.rest.maper.LeadMapper;
 import com.anysale.lead.adapters.out.messaging.LeadEventPublisher;
 import com.anysale.lead.adapters.out.persistence.InteractionJpaRepository;
 import com.anysale.lead.adapters.out.persistence.LeadJpaRepository;
@@ -29,14 +31,16 @@ public class LeadInboundService implements HandleIncomingMessageUseCase {
 
     @Override
     @Transactional
-    public void execute(IncomingMessageRequest request) {
+    public LeadResponseDto execute(IncomingMessageRequest request) {
         String normalizedPhone = normalizePhone(request.phone());
         String normalizedChannel = normalizeChannel(request.channel());
         String externalMessageId = trimToNull(request.externalMessageId());
 
-        if (externalMessageId != null &&
-                interactionRepository.findByChannelAndExternalMessageId(normalizedChannel, externalMessageId).isPresent()) {
-            return;
+        if (externalMessageId != null) {
+            LeadResponseDto duplicateLeadResponse = findExistingLeadResponse(normalizedChannel, externalMessageId);
+            if (duplicateLeadResponse != null) {
+                return duplicateLeadResponse;
+            }
         }
 
         LeadResolution leadResolution = resolveLead(request, normalizedPhone, normalizedChannel);
@@ -50,9 +54,11 @@ public class LeadInboundService implements HandleIncomingMessageUseCase {
         try {
             interactionRepository.save(interaction);
         } catch (DataIntegrityViolationException ex) {
-            if (externalMessageId != null &&
-                    interactionRepository.findByChannelAndExternalMessageId(normalizedChannel, externalMessageId).isPresent()) {
-                return;
+            if (externalMessageId != null) {
+                LeadResponseDto duplicateLeadResponse = findExistingLeadResponse(normalizedChannel, externalMessageId);
+                if (duplicateLeadResponse != null) {
+                    return duplicateLeadResponse;
+                }
             }
             throw ex;
         }
@@ -63,6 +69,7 @@ public class LeadInboundService implements HandleIncomingMessageUseCase {
         leadEventPublisher.publishLeadUpdated(leadResolution.lead(), "INCOMING_MESSAGE_RECEIVED");
 
         // TODO plug AI classification/scoring/auto-response from this flow.
+        return LeadMapper.toResponse(leadResolution.lead());
     }
 
     private LeadResolution resolveLead(IncomingMessageRequest request, String normalizedPhone, String normalizedChannel) {
@@ -137,6 +144,13 @@ public class LeadInboundService implements HandleIncomingMessageUseCase {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private LeadResponseDto findExistingLeadResponse(String normalizedChannel, String externalMessageId) {
+        return interactionRepository.findByChannelAndExternalMessageId(normalizedChannel, externalMessageId)
+                .map(Interaction::getLead)
+                .map(LeadMapper::toResponse)
+                .orElse(null);
     }
 
     private record LeadResolution(Lead lead, boolean created) {

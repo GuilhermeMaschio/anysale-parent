@@ -27,6 +27,10 @@
     {
       "key": "leadId",
       "value": ""
+    },
+    {
+      "key": "normalizedPhone",
+      "value": ""
     }
   ],
   "item": [
@@ -216,7 +220,10 @@
                   "pm.response.to.have.status(200);",
                   "const json = pm.response.json();",
                   "pm.expect(json.status).to.eql('RECEIVED');",
-                  "pm.collectionVariables.set('normalizedPhone', json.normalizedPhone);"
+                  "pm.expect(json.leadId).to.exist;",
+                  "pm.expect(json.lead.id).to.eql(json.leadId);",
+                  "pm.collectionVariables.set('normalizedPhone', json.normalizedPhone);",
+                  "pm.collectionVariables.set('leadId', json.leadId);"
                 ]
               }
             }
@@ -245,7 +252,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.response.to.have.status(200);"
+                  "pm.response.to.have.status(200);",
+                  "const json = pm.response.json();",
+                  "pm.expect(json.id).to.exist;",
+                  "pm.collectionVariables.set('leadId', json.id);"
                 ]
               }
             }

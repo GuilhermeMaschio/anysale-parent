@@ -2,6 +2,7 @@ package com.anysale.application.service;
 
 import com.anysale.adapters.in.web.dto.IncomingMessageRequest;
 import com.anysale.adapters.in.web.dto.IncomingMessageResponse;
+import com.anysale.application.model.LeadSnapshot;
 import com.anysale.application.port.out.LeadGatewayPort;
 import com.anysale.application.port.out.MessageEventPublisherPort;
 import com.anysale.application.usecase.ReceiveIncomingMessageUseCase;
@@ -31,7 +32,16 @@ public class MessageIngestionService implements ReceiveIncomingMessageUseCase {
 
         return leadGatewayPort.createOrUpdateLeadFromIncomingMessage(incomingMessage)
                 .doOnSuccess(ignored -> messageEventPublisherPort.publishIncomingMessage(incomingMessage))
-                .thenReturn(new IncomingMessageResponse("RECEIVED", normalizedPhone));
+                .map(lead -> toResponse(normalizedPhone, lead));
+    }
+
+    private IncomingMessageResponse toResponse(String normalizedPhone, LeadSnapshot lead) {
+        return new IncomingMessageResponse(
+                "RECEIVED",
+                normalizedPhone,
+                lead.id(),
+                lead
+        );
     }
 
     private String normalizePhone(String phone) {

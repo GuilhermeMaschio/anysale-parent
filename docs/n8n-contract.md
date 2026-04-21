@@ -52,7 +52,24 @@ Response body:
 ```json
 {
   "status": "RECEIVED",
-  "normalizedPhone": "5541999999999"
+  "normalizedPhone": "5541999999999",
+  "leadId": "3c04b6f5-91e2-4524-bf0f-1f2ce58d0d3b",
+  "lead": {
+    "id": "3c04b6f5-91e2-4524-bf0f-1f2ce58d0d3b",
+    "name": "Contato 5541999999999",
+    "email": null,
+    "phone": "5541999999999",
+    "source": "WHATSAPP",
+    "desiredCategory": null,
+    "desiredTags": [],
+    "stage": "CONTACTED",
+    "lastMessage": "Quero saber mais sobre cadeira ergonomica",
+    "lastInteractionAt": "2026-04-20T01:12:30Z",
+    "summary": null,
+    "intent": null,
+    "score": null,
+    "nextAction": null
+  }
 }
 ```
 
@@ -77,9 +94,26 @@ Request body:
 }
 ```
 
-Response:
-- `200 OK`
-- empty body
+Response body:
+
+```json
+{
+  "id": "3c04b6f5-91e2-4524-bf0f-1f2ce58d0d3b",
+  "name": "Contato 5541999999999",
+  "email": null,
+  "phone": "5541999999999",
+  "source": "WHATSAPP",
+  "desiredCategory": null,
+  "desiredTags": [],
+  "stage": "CONTACTED",
+  "lastMessage": "Quero saber mais sobre cadeira ergonomica",
+  "lastInteractionAt": "2026-04-20T01:12:30Z",
+  "summary": null,
+  "intent": null,
+  "score": null,
+  "nextAction": null
+}
+```
 
 ### 3. Enrich Lead With AI Result
 
@@ -202,8 +236,7 @@ Example response:
 
 - The WhatsApp MVP still identifies leads by `phone`.
 - Instagram support will require a channel identity such as `externalContactId`.
-- The inbound gateway response does not return `leadId` yet.
-- If n8n needs the lead identifier immediately after inbound, it currently needs an orchestration strategy on top of the existing APIs.
+- The lead snapshot returned by inbound reflects the state right after persistence, before any later asynchronous enrichment or follow-up processing.
 
 ## Postman
 
