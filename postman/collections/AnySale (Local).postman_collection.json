@@ -31,6 +31,10 @@
     {
       "key": "normalizedPhone",
       "value": ""
+    },
+    {
+      "key": "whatsappVerifyToken",
+      "value": ""
     }
   ],
   "item": [
@@ -114,6 +118,61 @@
             "method": "GET",
             "header": [],
             "url": "{{gatewayServiceUrl}}/actuator/health"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "WhatsApp Direct Webhook",
+      "item": [
+        {
+          "name": "Verify Webhook Challenge",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.response.to.have.status(200);",
+                  "pm.expect(pm.response.text()).to.eql('challenge-123');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{gatewayServiceUrl}}/v1/whatsapp/webhook?hub.mode=subscribe&hub.verify_token={{whatsappVerifyToken}}&hub.challenge=challenge-123"
+          },
+          "response": []
+        },
+        {
+          "name": "Receive Text Message (Unsigned Local)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"object\": \"whatsapp_business_account\",\n  \"entry\": [\n    {\n      \"id\": \"123456789\",\n      \"changes\": [\n        {\n          \"field\": \"messages\",\n          \"value\": {\n            \"messaging_product\": \"whatsapp\",\n            \"metadata\": {\n              \"display_phone_number\": \"55 41 99999-9999\",\n              \"phone_number_id\": \"987654321\"\n            },\n            \"contacts\": [\n              {\n                \"profile\": {\n                  \"name\": \"Guilherme Maschio\"\n                },\n                \"wa_id\": \"5541999999999\"\n              }\n            ],\n            \"messages\": [\n              {\n                \"from\": \"5541999999999\",\n                \"id\": \"wamid.direct.001\",\n                \"timestamp\": \"1713575550\",\n                \"text\": {\n                  \"body\": \"Quero saber mais sobre cadeira ergonomica\"\n                },\n                \"type\": \"text\"\n              }\n            ]\n          }\n        }\n      ]\n    }\n  ]\n}"
+            },
+            "url": "{{gatewayServiceUrl}}/v1/whatsapp/webhook"
           },
           "response": []
         }

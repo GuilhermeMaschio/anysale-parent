@@ -1,16 +1,17 @@
 # n8n Contract
 
-This document is the authoritative contract for the current WhatsApp + n8n MVP flow.
+This document is the authoritative contract for the current WhatsApp inbound MVP flow.
 
 ## Recommended Flow
 
-1. n8n receives the WhatsApp webhook from Meta.
-2. n8n normalizes the provider payload and calls the gateway endpoint:
-   `POST http://localhost:8083/v1/messages/incoming`
+1. Meta sends WhatsApp Cloud API webhooks directly to the gateway endpoint:
+   `GET/POST http://localhost:8083/v1/whatsapp/webhook`
+2. The gateway validates the webhook challenge/signature, extracts text messages, and normalizes them.
 3. The gateway forwards the message to the lead service.
 4. The lead service creates or updates the lead, persists the interaction, and updates:
    `lastMessage`, `lastInteractionAt`, and `stage`.
-5. n8n runs AI classification and enrichment.
+5. n8n can still be used for local testing or later downstream automations through the normalized gateway endpoint:
+   `POST http://localhost:8083/v1/messages/incoming`
 6. n8n sends the AI result back to:
    `PATCH http://localhost:8080/v1/leads/{leadId}/enrichment`
 7. n8n can fetch the latest lead state and the interaction history with:
@@ -19,7 +20,84 @@ This document is the authoritative contract for the current WhatsApp + n8n MVP f
 
 ## Endpoint Summary
 
-### 1. Receive Incoming Message
+### 1. Direct WhatsApp Cloud API Webhook
+
+Recommended external endpoint for Meta:
+
+`GET /v1/whatsapp/webhook`
+`POST /v1/whatsapp/webhook`
+
+Service:
+`anysale-ingestion-gateway`
+
+Required runtime settings:
+- `WHATSAPP_WEBHOOK_VERIFY_TOKEN`: the verify token configured in the Meta app.
+- `WHATSAPP_APP_SECRET`: the Meta app secret used to validate `X-Hub-Signature-256`.
+
+For local development, if `WHATSAPP_APP_SECRET` is blank, the gateway accepts unsigned POSTs. Production should always set the app secret.
+
+Verification request from Meta:
+
+```http
+GET /v1/whatsapp/webhook?hub.mode=subscribe&hub.verify_token={token}&hub.challenge={challenge}
+```
+
+Expected verification response:
+- `200 OK` with the raw challenge as the response body when the token matches.
+- `403 Forbidden` when the token does not match.
+
+Message webhook request from Meta:
+
+```json
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "123456789",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "55 41 99999-9999",
+              "phone_number_id": "987654321"
+            },
+            "contacts": [
+              {
+                "profile": {
+                  "name": "Guilherme Maschio"
+                },
+                "wa_id": "5541999999999"
+              }
+            ],
+            "messages": [
+              {
+                "from": "5541999999999",
+                "id": "wamid.HBgNNTU0MTk5OTk5OTk5ORUCABIYFDk4Rjc4AA",
+                "timestamp": "1713575550",
+                "text": {
+                  "body": "Quero saber mais sobre cadeira ergonomica"
+                },
+                "type": "text"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+Current behavior:
+- Text messages are mapped to the internal incoming message contract.
+- Status-only webhook payloads are acknowledged with `200 OK` and ignored.
+- Unsupported message types are ignored for now.
+- Invalid signatures return `403 Forbidden`.
+- Invalid JSON returns `400 Bad Request`.
+
+### 2. Normalized Incoming Message
 
 Recommended external endpoint for n8n:
 
@@ -73,7 +151,7 @@ Response body:
 }
 ```
 
-### 2. Internal Inbound Endpoint
+### 3. Internal Inbound Endpoint
 
 Internal endpoint used by the gateway:
 
@@ -115,7 +193,7 @@ Response body:
 }
 ```
 
-### 3. Enrich Lead With AI Result
+### 4. Enrich Lead With AI Result
 
 `PATCH /v1/leads/{leadId}/enrichment`
 
@@ -170,7 +248,7 @@ Response body:
 }
 ```
 
-### 4. Get Lead
+### 5. Get Lead
 
 `GET /v1/leads/{leadId}`
 
@@ -202,7 +280,7 @@ Example response:
 }
 ```
 
-### 5. Get Interaction History
+### 6. Get Interaction History
 
 `GET /v1/leads/{leadId}/interactions`
 
