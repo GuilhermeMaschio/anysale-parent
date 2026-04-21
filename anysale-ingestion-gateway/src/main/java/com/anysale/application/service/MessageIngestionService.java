@@ -8,6 +8,7 @@ import com.anysale.application.usecase.ReceiveIncomingMessageUseCase;
 import com.anysale.domain.model.IncomingMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
 
 @Service
 @RequiredArgsConstructor
@@ -17,7 +18,7 @@ public class MessageIngestionService implements ReceiveIncomingMessageUseCase {
     private final MessageEventPublisherPort messageEventPublisherPort;
 
     @Override
-    public IncomingMessageResponse execute(IncomingMessageRequest request) {
+    public Mono<IncomingMessageResponse> execute(IncomingMessageRequest request) {
         String normalizedPhone = normalizePhone(request.phone());
 
         IncomingMessage incomingMessage = IncomingMessage.builder()
@@ -28,10 +29,9 @@ public class MessageIngestionService implements ReceiveIncomingMessageUseCase {
                 .externalMessageId(request.externalMessageId())
                 .build();
 
-        leadGatewayPort.createOrUpdateLeadFromIncomingMessage(incomingMessage);
-        messageEventPublisherPort.publishIncomingMessage(incomingMessage);
-
-        return new IncomingMessageResponse("RECEIVED", normalizedPhone);
+        return leadGatewayPort.createOrUpdateLeadFromIncomingMessage(incomingMessage)
+                .doOnSuccess(ignored -> messageEventPublisherPort.publishIncomingMessage(incomingMessage))
+                .thenReturn(new IncomingMessageResponse("RECEIVED", normalizedPhone));
     }
 
     private String normalizePhone(String phone) {

@@ -7,29 +7,53 @@ services:
       POSTGRES_DB: anysale
       POSTGRES_USER: anysale
       POSTGRES_PASSWORD: secret
-    ports: ["5435:5432"]
-    volumes: ["pgdata:/var/lib/postgresql/data"]
+    ports:
+      - "5435:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
 
   mongo:
     image: mongo:6
     container_name: mongo-anysale
-    ports: ["27017:27017"]
+    ports:
+      - "27017:27017"
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.1
     container_name: zk-anysale
-    environment: { ZOOKEEPER_CLIENT_PORT: 2181 }
-    ports: ["2181:2181"]
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
 
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     container_name: kafka-anysale
-    depends_on: [zookeeper]
-    ports: ["9092:9092"]
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
     environment:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-volumes: { pgdata: {} }
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: n8n-anysale
+    ports:
+      - "5678:5678"
+    environment:
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      NODE_ENV: production
+      GENERIC_TIMEZONE: America/Sao_Paulo
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  pgdata: {}
+  n8n_data: {}

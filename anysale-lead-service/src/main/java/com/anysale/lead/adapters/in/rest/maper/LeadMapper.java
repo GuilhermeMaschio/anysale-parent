@@ -1,9 +1,11 @@
 package com.anysale.lead.adapters.in.rest.maper;
 
+import com.anysale.lead.adapters.in.rest.dto.InteractionResponseDto;
 import com.anysale.lead.adapters.in.rest.dto.LeadResponseDto;
 import com.anysale.lead.adapters.in.rest.dto.LeadSuggestionDto;
 import com.anysale.lead.adapters.in.rest.dto.SuggestionItemDto;
 import com.anysale.lead.adapters.in.rest.dto.SuggestionPatchRequestDto;
+import com.anysale.lead.domain.model.Interaction;
 import com.anysale.lead.domain.model.Lead;
 import com.anysale.lead.domain.model.LeadSuggestion;
 
@@ -23,6 +25,12 @@ public final class LeadMapper {
                 .desiredCategory(lead.getDesiredCategory())
                 .desiredTags(lead.getDesiredTags())
                 .stage(lead.getStage())
+                .lastMessage(lead.getLastMessage())
+                .lastInteractionAt(lead.getLastInteractionAt())
+                .summary(lead.getSummary())
+                .intent(lead.getIntent())
+                .score(lead.getScore())
+                .nextAction(lead.getNextAction())
                 .build();
     }
 
@@ -51,6 +59,18 @@ public final class LeadMapper {
                 .currency(s.getCurrency())
                 .vendor(s.getVendor())
                 .createdAt(s.getCreatedAt())
+                .build();
+    }
+
+    public static InteractionResponseDto toInteractionResponse(Interaction interaction) {
+        if (interaction == null) return null;
+        return InteractionResponseDto.builder()
+                .id(interaction.getId())
+                .message(interaction.getMessage())
+                .channel(interaction.getChannel())
+                .direction(interaction.getDirection())
+                .externalMessageId(interaction.getExternalMessageId())
+                .createdAt(interaction.getCreatedAt())
                 .build();
     }
 }

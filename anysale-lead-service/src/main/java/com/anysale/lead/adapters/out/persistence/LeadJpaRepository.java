@@ -11,6 +11,7 @@ import java.util.UUID;
 
 public interface LeadJpaRepository extends JpaRepository<Lead, UUID> {
 
+    @EntityGraph(attributePaths = "desiredTags")
     @Query("""
          SELECT l FROM Lead l
          WHERE (:stage IS NULL OR l.stage = :stage)

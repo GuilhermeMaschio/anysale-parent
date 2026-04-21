@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 @Component
 @RequiredArgsConstructor
@@ -15,7 +16,7 @@ public class LeadServiceClient implements LeadGatewayPort {
     private final WebClient leadServiceWebClient;
 
     @Override
-    public void createOrUpdateLeadFromIncomingMessage(IncomingMessage message) {
+    public Mono<Void> createOrUpdateLeadFromIncomingMessage(IncomingMessage message) {
         CreateOrUpdateLeadRequest request = new CreateOrUpdateLeadRequest(
                 message.getPhone(),
                 message.getLeadName(),
@@ -24,12 +25,11 @@ public class LeadServiceClient implements LeadGatewayPort {
                 message.getExternalMessageId()
         );
 
-        leadServiceWebClient.post()
+        return leadServiceWebClient.post()
                 .uri("/v1/leads/incoming-message")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .retrieve()
-                .toBodilessEntity()
-                .block();
+                .bodyToMono(Void.class);
     }
 }

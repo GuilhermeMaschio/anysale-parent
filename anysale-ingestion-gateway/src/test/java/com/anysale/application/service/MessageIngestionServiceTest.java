@@ -11,9 +11,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import reactor.core.publisher.Mono;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class MessageIngestionServiceTest {
@@ -37,7 +40,9 @@ class MessageIngestionServiceTest {
                 "msg-1"
         );
 
-        IncomingMessageResponse response = service.execute(request);
+        when(leadGatewayPort.createOrUpdateLeadFromIncomingMessage(any())).thenReturn(Mono.empty());
+
+        IncomingMessageResponse response = service.execute(request).block();
 
         assertThat(response.status()).isEqualTo("RECEIVED");
         assertThat(response.normalizedPhone()).isEqualTo("5541999999999");

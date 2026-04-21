@@ -137,4 +137,24 @@ class LeadInboundServiceTest {
         verify(leadEventPublisher, never()).publishLeadCreated(any(Lead.class));
         verify(leadEventPublisher, never()).publishLeadUpdated(any(Lead.class), eq("INCOMING_MESSAGE_RECEIVED"));
     }
+
+    @Test
+    void usesFallbackNameWhenInboundLeadNameIsMissing() {
+        IncomingMessageRequest request = new IncomingMessageRequest(
+                "41999999999",
+                "   ",
+                "Mensagem recebida",
+                "WHATSAPP",
+                null
+        );
+
+        when(leadRepository.findAllByNormalizedPhone("41999999999")).thenReturn(List.of());
+        when(leadRepository.save(any(Lead.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.execute(request);
+
+        ArgumentCaptor<Lead> leadCaptor = ArgumentCaptor.forClass(Lead.class);
+        verify(leadRepository).save(leadCaptor.capture());
+        assertThat(leadCaptor.getValue().getName()).isEqualTo("Contato 41999999999");
+    }
 }

@@ -82,4 +82,18 @@ public class LeadCommandController {
                 .eTag("\"" + out.getUpdatedAt().toEpochMilli() + "\"")
                 .body(out);
     }
+
+    @PatchMapping("/{id}/enrichment")
+    public ResponseEntity<LeadResponseDto> enrich(
+            @PathVariable UUID id,
+            @Valid @RequestBody LeadEnrichmentRequestDto body) {
+
+        Lead saved = service.applyEnrichment(id, body);
+        LeadResponseDto response = LeadMapper.toResponse(saved);
+
+        return ResponseEntity.ok()
+                .location(URI.create("/v1/leads/" + id))
+                .eTag("\"" + saved.getUpdatedAt().toEpochMilli() + "\"")
+                .body(response);
+    }
 }

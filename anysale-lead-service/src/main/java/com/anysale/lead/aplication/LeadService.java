@@ -2,13 +2,15 @@ package com.anysale.lead.aplication;
 
 import com.anysale.contracts.event.LeadUpdatedEvent;
 import com.anysale.lead.adapters.in.rest.dto.BulkApplyResponseDto;
-import com.anysale.lead.adapters.in.rest.dto.LeadResponseDto;
+import com.anysale.lead.adapters.in.rest.dto.LeadEnrichmentRequestDto;
 import com.anysale.lead.adapters.in.rest.dto.LeadSuggestionDto;
 import com.anysale.lead.adapters.in.rest.dto.StageChangedResponseDto;
 import com.anysale.lead.adapters.in.rest.maper.LeadMapper;
 import com.anysale.lead.adapters.out.messaging.LeadEventPublisher;
+import com.anysale.lead.adapters.out.persistence.InteractionJpaRepository;
 import com.anysale.lead.adapters.out.persistence.LeadJpaRepository;
 import com.anysale.lead.adapters.out.persistence.LeadSuggestionJpaRepository;
+import com.anysale.lead.domain.model.Interaction;
 import com.anysale.lead.domain.model.Lead;
 import com.anysale.lead.domain.model.LeadSuggestion;
 import org.springframework.data.domain.Page;
@@ -29,13 +31,16 @@ public class LeadService {
 
     private final LeadJpaRepository leadRepo;
     private final LeadSuggestionJpaRepository suggestionRepo;
+    private final InteractionJpaRepository interactionRepo;
     private final LeadEventPublisher events;
 
     public LeadService(LeadJpaRepository leadRepo,
                        LeadSuggestionJpaRepository suggestionRepo,
+                       InteractionJpaRepository interactionRepo,
                        LeadEventPublisher events) {
         this.leadRepo = leadRepo;
         this.suggestionRepo = suggestionRepo;
+        this.interactionRepo = interactionRepo;
         this.events = events;
     }
 
@@ -75,8 +80,16 @@ public class LeadService {
 
     @Transactional(readOnly = true)
     public Lead get(UUID id) {
-        return leadRepo.findById(id)
+        return leadRepo.findByIdWithTags(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lead not found: " + id));
+    }
+
+    @Transactional(readOnly = true)
+    public List<Interaction> listInteractions(UUID leadId) {
+        if (!leadRepo.existsById(leadId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Lead not found: " + leadId);
+        }
+        return interactionRepo.findByLead_IdOrderByCreatedAtAsc(leadId);
     }
 
 
@@ -99,6 +112,35 @@ public class LeadService {
         }
         String digitsOnly = trimmed.replaceAll("\\D", "");
         return digitsOnly.isBlank() ? trimmed : digitsOnly;
+    }
+
+    @Transactional
+    public Lead applyEnrichment(UUID leadId, LeadEnrichmentRequestDto request) {
+        Lead lead = leadRepo.findByIdWithTags(leadId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lead not found: " + leadId));
+
+        if (request.getSummary() != null) {
+            lead.setSummary(trimToNull(request.getSummary()));
+        }
+        if (request.getIntent() != null) {
+            lead.setIntent(trimToNull(request.getIntent()));
+        }
+        if (request.getDesiredCategory() != null) {
+            lead.setDesiredCategory(trimToNull(request.getDesiredCategory()));
+        }
+        if (request.getDesiredTags() != null) {
+            lead.setDesiredTags(sanitizeTags(request.getDesiredTags()));
+        }
+        if (request.getScore() != null) {
+            lead.setScore(request.getScore());
+        }
+        if (request.getNextAction() != null) {
+            lead.setNextAction(trimToNull(request.getNextAction()));
+        }
+
+        Lead saved = leadRepo.save(lead);
+        publishAfterCommitOrNow(() -> events.publishLeadUpdated(saved, "ENRICHMENT_UPDATED"));
+        return saved;
     }
 
 
@@ -178,6 +220,22 @@ public class LeadService {
                 .updatedAt(lead.getUpdatedAt())
                 .items(results)
                 .build();
+    }
+
+    private String trimToNull(String value) {
+        String normalized = normalize(value);
+        return normalized == null ? null : normalized;
+    }
+
+    private List<String> sanitizeTags(List<String> tags) {
+        if (tags == null) {
+            return new ArrayList<>();
+        }
+        return tags.stream()
+                .map(this::trimToNull)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
     private boolean isBlank(String s) { return s == null || s.isBlank(); }

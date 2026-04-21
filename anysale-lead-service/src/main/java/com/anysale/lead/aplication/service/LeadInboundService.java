@@ -68,17 +68,18 @@ public class LeadInboundService implements HandleIncomingMessageUseCase {
     private LeadResolution resolveLead(IncomingMessageRequest request, String normalizedPhone, String normalizedChannel) {
         Lead lead = leadRepository.findAllByNormalizedPhone(normalizedPhone).stream().findFirst().orElse(null);
         boolean created = false;
+        String fallbackLeadName = fallbackLeadName(request.leadName(), normalizedPhone);
 
         if (lead == null) {
             lead = new Lead();
             lead.setPhone(normalizedPhone);
-            lead.setName(trimToNull(request.leadName()));
+            lead.setName(fallbackLeadName);
             lead.setSource(normalizedChannel);
             created = true;
         } else {
             lead.setPhone(normalizedPhone);
             if (isBlank(lead.getName())) {
-                lead.setName(trimToNull(request.leadName()));
+                lead.setName(fallbackLeadName);
             }
             if (isBlank(lead.getSource())) {
                 lead.setSource(normalizedChannel);
@@ -91,6 +92,14 @@ public class LeadInboundService implements HandleIncomingMessageUseCase {
 
         Lead savedLead = leadRepository.save(lead);
         return new LeadResolution(savedLead, created);
+    }
+
+    private String fallbackLeadName(String leadName, String normalizedPhone) {
+        String normalizedLeadName = trimToNull(leadName);
+        if (normalizedLeadName != null) {
+            return normalizedLeadName;
+        }
+        return "Contato " + normalizedPhone;
     }
 
     private void moveToContactedStageIfNeeded(Lead lead) {
