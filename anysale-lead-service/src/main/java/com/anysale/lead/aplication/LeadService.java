@@ -2,6 +2,7 @@ package com.anysale.lead.aplication;
 
 import com.anysale.contracts.event.LeadUpdatedEvent;
 import com.anysale.lead.adapters.in.rest.dto.BulkApplyResponseDto;
+import com.anysale.lead.adapters.in.rest.dto.InteractionStatusUpdateRequest;
 import com.anysale.lead.adapters.in.rest.dto.LeadEnrichmentRequestDto;
 import com.anysale.lead.adapters.in.rest.dto.LeadSuggestionDto;
 import com.anysale.lead.adapters.in.rest.dto.StageChangedResponseDto;
@@ -92,6 +93,78 @@ public class LeadService {
         return interactionRepo.findByLead_IdOrderByCreatedAtAsc(leadId);
     }
 
+    @Transactional
+    public Interaction recordOutboundInteraction(UUID leadId, com.anysale.lead.adapters.in.rest.dto.OutboundInteractionRequest request) {
+        Lead lead = leadRepo.findByIdWithTags(leadId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lead not found: " + leadId));
+
+        String normalizedChannel = normalizeChannel(request.channel());
+        String externalMessageId = trimToNull(request.externalMessageId());
+
+        if (externalMessageId != null) {
+            Optional<Interaction> existing = interactionRepo.findByChannelAndExternalMessageId(normalizedChannel, externalMessageId);
+            if (existing.isPresent()) {
+                return existing.get();
+            }
+        }
+
+        Interaction interaction = new Interaction();
+        interaction.setLead(lead);
+        interaction.setMessage(request.message().trim());
+        interaction.setChannel(normalizedChannel);
+        interaction.setDirection("OUT");
+        interaction.setExternalMessageId(externalMessageId);
+
+        Interaction saved = interactionRepo.save(interaction);
+
+        lead.setLastMessage(request.message().trim());
+        lead.setLastInteractionAt(Instant.now());
+        leadRepo.save(lead);
+
+        publishAfterCommitOrNow(() -> events.publishLeadUpdated(lead, "OUTBOUND_MESSAGE_SENT"));
+        return saved;
+    }
+
+    @Transactional
+    public void updateInteractionStatus(InteractionStatusUpdateRequest request) {
+        String normalizedChannel = normalizeChannel(request.channel());
+        String externalMessageId = trimToNull(request.externalMessageId());
+        String normalizedStatus = normalizeStatus(request.status());
+
+        if (normalizedChannel == null || externalMessageId == null || normalizedStatus == null) {
+            return;
+        }
+
+        Optional<Interaction> existing = interactionRepo.findByChannelAndExternalMessageId(normalizedChannel, externalMessageId);
+        if (existing.isEmpty()) {
+            return;
+        }
+
+        Interaction interaction = existing.get();
+        Instant statusTimestamp = request.statusTimestamp() != null ? request.statusTimestamp() : Instant.now();
+        Instant currentStatusTimestamp = interaction.getDeliveryStatusAt();
+        if (currentStatusTimestamp != null && statusTimestamp.isBefore(currentStatusTimestamp)) {
+            return;
+        }
+
+        interaction.setDeliveryStatus(normalizedStatus);
+        interaction.setDeliveryStatusAt(statusTimestamp);
+        interaction.setDeliveryRecipientId(trimToNull(request.recipientId()));
+
+        if ("FAILED".equals(normalizedStatus)) {
+            interaction.setDeliveryErrorCode(trimToNull(request.errorCode()));
+            interaction.setDeliveryErrorTitle(trimToNull(request.errorTitle()));
+            interaction.setDeliveryErrorMessage(trimToNull(request.errorMessage()));
+        } else {
+            interaction.setDeliveryErrorCode(null);
+            interaction.setDeliveryErrorTitle(null);
+            interaction.setDeliveryErrorMessage(null);
+        }
+
+        interactionRepo.save(interaction);
+        publishAfterCommitOrNow(() -> events.publishLeadUpdated(interaction.getLead(), "WHATSAPP_STATUS_" + normalizedStatus));
+    }
+
 
     @Transactional(readOnly = true)
     public Page<Lead> list(String stage, String q, int page, int size, Sort sort) {
@@ -103,6 +176,16 @@ public class LeadService {
 
     private String normalize(String s) {
         return (s == null || s.isBlank()) ? null : s.trim();
+    }
+
+    private String normalizeChannel(String channel) {
+        String normalized = normalize(channel);
+        return normalized == null ? null : normalized.toUpperCase();
+    }
+
+    private String normalizeStatus(String status) {
+        String normalized = normalize(status);
+        return normalized == null ? null : normalized.toUpperCase();
     }
 
     private String normalizePhone(String phone) {

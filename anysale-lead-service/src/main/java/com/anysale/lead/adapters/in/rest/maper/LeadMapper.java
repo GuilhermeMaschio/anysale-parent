@@ -16,6 +16,10 @@ public final class LeadMapper {
     private LeadMapper() {}
 
     public static LeadResponseDto toResponse(Lead lead) {
+        List<String> desiredTags = lead.getDesiredTags() == null
+                ? List.of()
+                : new ArrayList<>(lead.getDesiredTags());
+
         return LeadResponseDto.builder()
                 .id(lead.getId())
                 .name(lead.getName())
@@ -23,7 +27,7 @@ public final class LeadMapper {
                 .phone(lead.getPhone())
                 .source(lead.getSource())
                 .desiredCategory(lead.getDesiredCategory())
-                .desiredTags(lead.getDesiredTags())
+                .desiredTags(desiredTags)
                 .stage(lead.getStage())
                 .lastMessage(lead.getLastMessage())
                 .lastInteractionAt(lead.getLastInteractionAt())
@@ -70,6 +74,12 @@ public final class LeadMapper {
                 .channel(interaction.getChannel())
                 .direction(interaction.getDirection())
                 .externalMessageId(interaction.getExternalMessageId())
+                .deliveryStatus(interaction.getDeliveryStatus())
+                .deliveryStatusAt(interaction.getDeliveryStatusAt())
+                .deliveryRecipientId(interaction.getDeliveryRecipientId())
+                .deliveryErrorCode(interaction.getDeliveryErrorCode())
+                .deliveryErrorTitle(interaction.getDeliveryErrorTitle())
+                .deliveryErrorMessage(interaction.getDeliveryErrorMessage())
                 .createdAt(interaction.getCreatedAt())
                 .build();
     }

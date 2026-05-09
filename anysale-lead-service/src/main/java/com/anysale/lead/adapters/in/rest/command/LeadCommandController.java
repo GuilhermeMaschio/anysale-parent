@@ -96,4 +96,24 @@ public class LeadCommandController {
                 .eTag("\"" + saved.getUpdatedAt().toEpochMilli() + "\"")
                 .body(response);
     }
+
+    @PostMapping("/{id}/interactions/outbound")
+    public ResponseEntity<InteractionResponseDto> recordOutboundInteraction(
+            @PathVariable UUID id,
+            @Valid @RequestBody OutboundInteractionRequest body) {
+
+        InteractionResponseDto response = LeadMapper.toInteractionResponse(
+                service.recordOutboundInteraction(id, body)
+        );
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/interactions/status")
+    public ResponseEntity<Void> updateInteractionStatus(
+            @Valid @RequestBody InteractionStatusUpdateRequest body) {
+
+        service.updateInteractionStatus(body);
+        return ResponseEntity.noContent().build();
+    }
 }

@@ -149,6 +149,9 @@ public class LeadInboundService implements HandleIncomingMessageUseCase {
     private LeadResponseDto findExistingLeadResponse(String normalizedChannel, String externalMessageId) {
         return interactionRepository.findByChannelAndExternalMessageId(normalizedChannel, externalMessageId)
                 .map(Interaction::getLead)
+                .filter(lead -> lead != null && lead.getId() != null)
+                .map(Lead::getId)
+                .flatMap(leadRepository::findByIdWithTags)
                 .map(LeadMapper::toResponse)
                 .orElse(null);
     }

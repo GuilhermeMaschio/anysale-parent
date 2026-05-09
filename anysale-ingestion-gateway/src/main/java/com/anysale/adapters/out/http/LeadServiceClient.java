@@ -1,7 +1,9 @@
 package com.anysale.adapters.out.http;
 
 import com.anysale.adapters.out.http.dto.CreateOrUpdateLeadRequest;
+import com.anysale.adapters.out.http.dto.InteractionStatusUpdateRequest;
 import com.anysale.application.model.LeadSnapshot;
+import com.anysale.application.model.MessageStatusUpdate;
 import com.anysale.application.port.out.LeadGatewayPort;
 import com.anysale.domain.model.IncomingMessage;
 import lombok.RequiredArgsConstructor;
@@ -32,5 +34,27 @@ public class LeadServiceClient implements LeadGatewayPort {
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(LeadSnapshot.class);
+    }
+
+    @Override
+    public Mono<Void> updateInteractionStatus(MessageStatusUpdate messageStatusUpdate) {
+        InteractionStatusUpdateRequest request = new InteractionStatusUpdateRequest(
+                messageStatusUpdate.channel(),
+                messageStatusUpdate.externalMessageId(),
+                messageStatusUpdate.status(),
+                messageStatusUpdate.statusTimestamp(),
+                messageStatusUpdate.recipientId(),
+                messageStatusUpdate.errorCode(),
+                messageStatusUpdate.errorTitle(),
+                messageStatusUpdate.errorMessage()
+        );
+
+        return leadServiceWebClient.post()
+                .uri("/v1/leads/interactions/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .retrieve()
+                .toBodilessEntity()
+                .then();
     }
 }

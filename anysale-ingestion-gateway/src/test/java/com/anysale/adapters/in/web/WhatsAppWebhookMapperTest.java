@@ -2,9 +2,11 @@ package com.anysale.adapters.in.web;
 
 import com.anysale.adapters.in.web.dto.IncomingMessageRequest;
 import com.anysale.adapters.in.web.dto.WhatsAppWebhookPayload;
+import com.anysale.application.model.MessageStatusUpdate;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,6 +38,22 @@ class WhatsAppWebhookMapperTest {
         List<IncomingMessageRequest> requests = mapper.toIncomingRequests(payload);
 
         assertThat(requests).isEmpty();
+    }
+
+    @Test
+    void mapsStatusPayloadToMessageStatusUpdate() throws Exception {
+        WhatsAppWebhookPayload payload = objectMapper.readValue(statusPayload(), WhatsAppWebhookPayload.class);
+
+        List<MessageStatusUpdate> updates = mapper.toStatusUpdates(payload);
+
+        assertThat(updates).hasSize(1);
+        MessageStatusUpdate update = updates.get(0);
+        assertThat(update.channel()).isEqualTo("WHATSAPP");
+        assertThat(update.externalMessageId()).isEqualTo("wamid.status");
+        assertThat(update.status()).isEqualTo("delivered");
+        assertThat(update.statusTimestamp()).isEqualTo(Instant.ofEpochSecond(1713575580L));
+        assertThat(update.recipientId()).isEqualTo("5541999999999");
+        assertThat(update.errorCode()).isNull();
     }
 
     private String textMessagePayload() {
@@ -101,7 +119,9 @@ class WhatsAppWebhookMapperTest {
                             "statuses": [
                               {
                                 "id": "wamid.status",
-                                "status": "delivered"
+                                "status": "delivered",
+                                "timestamp": "1713575580",
+                                "recipient_id": "5541999999999"
                               }
                             ]
                           }

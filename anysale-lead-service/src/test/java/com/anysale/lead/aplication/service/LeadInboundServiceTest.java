@@ -139,6 +139,7 @@ class LeadInboundServiceTest {
         interaction.setLead(lead);
         when(interactionRepository.findByChannelAndExternalMessageId("WHATSAPP", "msg-duplicada"))
                 .thenReturn(Optional.of(interaction));
+        when(leadRepository.findByIdWithTags(lead.getId())).thenReturn(Optional.of(lead));
 
         LeadResponseDto response = service.execute(request);
 

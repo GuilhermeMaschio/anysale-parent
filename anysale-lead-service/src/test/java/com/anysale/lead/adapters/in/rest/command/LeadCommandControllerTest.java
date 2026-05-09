@@ -1,6 +1,7 @@
 package com.anysale.lead.adapters.in.rest.command;
 
 import com.anysale.lead.aplication.LeadService;
+import com.anysale.lead.domain.model.Interaction;
 import com.anysale.lead.domain.model.Lead;
 import com.anysale.lead.idempotency.IdempotencyService;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -72,5 +74,53 @@ class LeadCommandControllerTest {
                 .andExpect(jsonPath("$.lastMessage").value("Quero comprar hoje"));
 
         verify(leadService).applyEnrichment(eq(leadId), any());
+    }
+
+    @Test
+    void recordOutboundInteractionReturnsSavedInteraction() throws Exception {
+        UUID leadId = UUID.randomUUID();
+        Interaction interaction = new Interaction();
+        interaction.setId(UUID.fromString("a2d82b58-0c80-471b-a496-7ae8f81b9d21"));
+        interaction.setMessage("Oi, posso te ajudar com a cadeira ergonomica.");
+        interaction.setChannel("WHATSAPP");
+        interaction.setDirection("OUT");
+        interaction.setExternalMessageId("wamid.outbound.001");
+        interaction.setCreatedAt(Instant.parse("2026-04-21T16:00:00Z"));
+
+        when(leadService.recordOutboundInteraction(eq(leadId), any())).thenReturn(interaction);
+
+        mockMvc.perform(post("/v1/leads/{id}/interactions/outbound", leadId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "message": "Oi, posso te ajudar com a cadeira ergonomica.",
+                                  "channel": "WHATSAPP",
+                                  "externalMessageId": "wamid.outbound.001"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("a2d82b58-0c80-471b-a496-7ae8f81b9d21"))
+                .andExpect(jsonPath("$.direction").value("OUT"))
+                .andExpect(jsonPath("$.externalMessageId").value("wamid.outbound.001"));
+
+        verify(leadService).recordOutboundInteraction(eq(leadId), any());
+    }
+
+    @Test
+    void updateInteractionStatusReturnsNoContent() throws Exception {
+        mockMvc.perform(post("/v1/leads/interactions/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "channel": "WHATSAPP",
+                                  "externalMessageId": "wamid.outbound.001",
+                                  "status": "delivered",
+                                  "statusTimestamp": "2026-05-09T12:05:00Z",
+                                  "recipientId": "5541999999999"
+                                }
+                                """))
+                .andExpect(status().isNoContent());
+
+        verify(leadService).updateInteractionStatus(any());
     }
 }

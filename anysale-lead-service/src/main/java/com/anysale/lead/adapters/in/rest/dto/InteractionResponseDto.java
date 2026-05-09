@@ -18,5 +18,11 @@ public class InteractionResponseDto {
     private String channel;
     private String direction;
     private String externalMessageId;
+    private String deliveryStatus;
+    private Instant deliveryStatusAt;
+    private String deliveryRecipientId;
+    private String deliveryErrorCode;
+    private String deliveryErrorTitle;
+    private String deliveryErrorMessage;
     private Instant createdAt;
 }

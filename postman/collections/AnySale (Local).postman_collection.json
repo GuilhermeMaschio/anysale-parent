@@ -35,6 +35,14 @@
     {
       "key": "whatsappVerifyToken",
       "value": ""
+    },
+    {
+      "key": "whatsappRecipientPhone",
+      "value": "5541999999999"
+    },
+    {
+      "key": "whatsappMessageId",
+      "value": ""
     }
   ],
   "item": [
@@ -171,6 +179,35 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"object\": \"whatsapp_business_account\",\n  \"entry\": [\n    {\n      \"id\": \"123456789\",\n      \"changes\": [\n        {\n          \"field\": \"messages\",\n          \"value\": {\n            \"messaging_product\": \"whatsapp\",\n            \"metadata\": {\n              \"display_phone_number\": \"55 41 99999-9999\",\n              \"phone_number_id\": \"987654321\"\n            },\n            \"contacts\": [\n              {\n                \"profile\": {\n                  \"name\": \"Guilherme Maschio\"\n                },\n                \"wa_id\": \"5541999999999\"\n              }\n            ],\n            \"messages\": [\n              {\n                \"from\": \"5541999999999\",\n                \"id\": \"wamid.direct.001\",\n                \"timestamp\": \"1713575550\",\n                \"text\": {\n                  \"body\": \"Quero saber mais sobre cadeira ergonomica\"\n                },\n                \"type\": \"text\"\n              }\n            ]\n          }\n        }\n      ]\n    }\n  ]\n}"
+            },
+            "url": "{{gatewayServiceUrl}}/v1/whatsapp/webhook"
+          },
+          "response": []
+        },
+        {
+          "name": "Receive Status Update (Unsigned Local)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"object\": \"whatsapp_business_account\",\n  \"entry\": [\n    {\n      \"id\": \"123456789\",\n      \"changes\": [\n        {\n          \"field\": \"messages\",\n          \"value\": {\n            \"messaging_product\": \"whatsapp\",\n            \"metadata\": {\n              \"display_phone_number\": \"55 41 99999-9999\",\n              \"phone_number_id\": \"987654321\"\n            },\n            \"statuses\": [\n              {\n                \"id\": \"{{whatsappMessageId}}\",\n                \"status\": \"delivered\",\n                \"timestamp\": \"1713575580\",\n                \"recipient_id\": \"{{whatsappRecipientPhone}}\"\n              }\n            ]\n          }\n        }\n      ]\n    }\n  ]\n}"
             },
             "url": "{{gatewayServiceUrl}}/v1/whatsapp/webhook"
           },
@@ -356,6 +393,37 @@
           "response": []
         },
         {
+          "name": "Record Outbound Interaction",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.response.to.have.status(200);",
+                  "const json = pm.response.json();",
+                  "pm.expect(json.direction).to.eql('OUT');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Oi, posso te ajudar com a cadeira ergonomica.\",\n  \"channel\": \"WHATSAPP\",\n  \"externalMessageId\": \"wamid.manual.outbound.001\"\n}"
+            },
+            "url": "{{leadServiceUrl}}/v1/leads/{{leadId}}/interactions/outbound"
+          },
+          "response": []
+        },
+        {
           "name": "Get Lead Interactions",
           "event": [
             {
@@ -433,6 +501,39 @@
               "raw": "{\n  \"stage\": \"WON\"\n}"
             },
             "url": "{{leadServiceUrl}}/v1/leads/{{leadId}}/stage"
+          },
+          "response": []
+        },
+        {
+          "name": "Send WhatsApp Text Message",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.response.to.have.status(200);",
+                  "const json = pm.response.json();",
+                  "pm.expect(json.status).to.eql('SENT');",
+                  "pm.expect(json.messageId).to.exist;",
+                  "pm.collectionVariables.set('whatsappMessageId', json.messageId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"leadId\": \"{{leadId}}\",\n  \"to\": \"{{whatsappRecipientPhone}}\",\n  \"message\": \"Oi, posso te ajudar com a cadeira ergonomica.\"\n}"
+            },
+            "url": "{{notificationServiceUrl}}/v1/notifications/whatsapp/messages"
           },
           "response": []
         },

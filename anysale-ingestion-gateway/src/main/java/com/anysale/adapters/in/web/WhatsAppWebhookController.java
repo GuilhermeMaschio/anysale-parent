@@ -2,6 +2,8 @@ package com.anysale.adapters.in.web;
 
 import com.anysale.adapters.in.web.dto.IncomingMessageRequest;
 import com.anysale.adapters.in.web.dto.WhatsAppWebhookPayload;
+import com.anysale.application.model.MessageStatusUpdate;
+import com.anysale.application.port.out.LeadGatewayPort;
 import com.anysale.application.usecase.ReceiveIncomingMessageUseCase;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,6 +28,7 @@ import java.util.List;
 public class WhatsAppWebhookController {
 
     private final ReceiveIncomingMessageUseCase receiveIncomingMessageUseCase;
+    private final LeadGatewayPort leadGatewayPort;
     private final WhatsAppWebhookMapper whatsAppWebhookMapper;
     private final WhatsAppWebhookSignatureVerifier signatureVerifier;
     private final ObjectMapper objectMapper;
@@ -33,12 +36,14 @@ public class WhatsAppWebhookController {
 
     public WhatsAppWebhookController(
             ReceiveIncomingMessageUseCase receiveIncomingMessageUseCase,
+            LeadGatewayPort leadGatewayPort,
             WhatsAppWebhookMapper whatsAppWebhookMapper,
             WhatsAppWebhookSignatureVerifier signatureVerifier,
             ObjectMapper objectMapper,
             @Value("${whatsapp.webhook.verify-token:${WHATSAPP_WEBHOOK_VERIFY_TOKEN:}}") String verifyToken
     ) {
         this.receiveIncomingMessageUseCase = receiveIncomingMessageUseCase;
+        this.leadGatewayPort = leadGatewayPort;
         this.whatsAppWebhookMapper = whatsAppWebhookMapper;
         this.signatureVerifier = signatureVerifier;
         this.objectMapper = objectMapper;
@@ -60,9 +65,13 @@ public class WhatsAppWebhookController {
     @PostMapping
     public Mono<ResponseEntity<Void>> receive(
             @RequestHeader(name = "X-Hub-Signature-256", required = false) String signature,
-            @RequestBody(required = false) String rawBody
+            @RequestBody(required = false) Mono<String> rawBody
     ) {
-        return handleWebhookBody(rawBody == null ? "" : rawBody, signature);
+        if (rawBody == null) {
+            return handleWebhookBody("", signature);
+        }
+        return rawBody.defaultIfEmpty("")
+                .flatMap(body -> handleWebhookBody(body, signature));
     }
 
     private Mono<ResponseEntity<Void>> handleWebhookBody(String rawBody, String signature) {
@@ -78,12 +87,21 @@ public class WhatsAppWebhookController {
         }
 
         List<IncomingMessageRequest> incomingMessages = whatsAppWebhookMapper.toIncomingRequests(payload);
-        if (incomingMessages.isEmpty()) {
+        List<MessageStatusUpdate> statusUpdates = whatsAppWebhookMapper.toStatusUpdates(payload);
+
+        if (incomingMessages.isEmpty() && statusUpdates.isEmpty()) {
             return Mono.just(emptyResponse(HttpStatus.OK));
         }
 
-        return Flux.fromIterable(incomingMessages)
+        Mono<Void> processIncomingMessages = Flux.fromIterable(incomingMessages)
                 .flatMap(receiveIncomingMessageUseCase::execute)
+                .then();
+
+        Mono<Void> processStatusUpdates = Flux.fromIterable(statusUpdates)
+                .flatMap(leadGatewayPort::updateInteractionStatus)
+                .then();
+
+        return Mono.when(processIncomingMessages, processStatusUpdates)
                 .then(Mono.just(emptyResponse(HttpStatus.OK)));
     }
 
