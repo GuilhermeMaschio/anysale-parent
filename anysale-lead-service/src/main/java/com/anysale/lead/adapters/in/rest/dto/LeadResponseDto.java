@@ -1,6 +1,7 @@
 package com.anysale.lead.adapters.in.rest.dto;
 
 import lombok.*;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -17,4 +18,10 @@ public class LeadResponseDto {
     private String desiredCategory;
     private List<String> desiredTags;
     private String stage;
+    private String lastMessage;
+    private Instant lastInteractionAt;
+    private String summary;
+    private String intent;
+    private Integer score;
+    private String nextAction;
 }

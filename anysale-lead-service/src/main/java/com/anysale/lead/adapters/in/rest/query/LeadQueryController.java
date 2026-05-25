@@ -1,13 +1,16 @@
 package com.anysale.lead.adapters.in.rest.query;
 
+import com.anysale.lead.adapters.in.rest.dto.InteractionResponseDto;
 import com.anysale.lead.adapters.in.rest.dto.LeadResponseDto;
 import com.anysale.lead.adapters.in.rest.maper.LeadMapper;
 import com.anysale.lead.aplication.LeadService;
+import com.anysale.lead.domain.model.Interaction;
 import com.anysale.lead.domain.model.Lead;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -20,6 +23,14 @@ public class LeadQueryController {
     @GetMapping("/{id}")
     public LeadResponseDto get(@PathVariable UUID id) {
         return LeadMapper.toResponse(service.get(id));
+    }
+
+    @GetMapping("/{id}/interactions")
+    public List<InteractionResponseDto> interactions(@PathVariable UUID id) {
+        List<Interaction> interactions = service.listInteractions(id);
+        return interactions.stream()
+                .map(LeadMapper::toInteractionResponse)
+                .toList();
     }
 
     @GetMapping

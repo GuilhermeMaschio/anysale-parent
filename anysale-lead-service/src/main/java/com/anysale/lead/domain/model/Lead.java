@@ -22,6 +22,23 @@ public class Lead {
 
     private String stage;
 
+    @Column(name = "last_message", length = 2000)
+    private String lastMessage;
+
+    @Column(name = "last_interaction_at")
+    private Instant lastInteractionAt;
+
+    @Column(length = 2000)
+    private String summary;
+
+    @Column(length = 120)
+    private String intent;
+
+    private Integer score;
+
+    @Column(name = "next_action", length = 500)
+    private String nextAction;
+
     // coleção de tags em tabela própria
     @ElementCollection
     @CollectionTable(name = "lead_desired_tag", joinColumns = @JoinColumn(name = "lead_id"))
@@ -59,6 +76,18 @@ public class Lead {
     public void setDesiredCategory(String desiredCategory) { this.desiredCategory = desiredCategory; }
     public String getStage() { return stage; }
     public void setStage(String stage) { this.stage = stage; }
+    public String getLastMessage() { return lastMessage; }
+    public void setLastMessage(String lastMessage) { this.lastMessage = lastMessage; }
+    public Instant getLastInteractionAt() { return lastInteractionAt; }
+    public void setLastInteractionAt(Instant lastInteractionAt) { this.lastInteractionAt = lastInteractionAt; }
+    public String getSummary() { return summary; }
+    public void setSummary(String summary) { this.summary = summary; }
+    public String getIntent() { return intent; }
+    public void setIntent(String intent) { this.intent = intent; }
+    public Integer getScore() { return score; }
+    public void setScore(Integer score) { this.score = score; }
+    public String getNextAction() { return nextAction; }
+    public void setNextAction(String nextAction) { this.nextAction = nextAction; }
     public List<String> getDesiredTags() { return desiredTags; }
     public void setDesiredTags(List<String> desiredTags) { this.desiredTags = desiredTags; }
     public Instant getCreatedAt() { return createdAt; }

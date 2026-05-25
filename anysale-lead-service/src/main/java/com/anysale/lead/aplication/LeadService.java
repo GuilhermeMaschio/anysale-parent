@@ -2,13 +2,16 @@ package com.anysale.lead.aplication;
 
 import com.anysale.contracts.event.LeadUpdatedEvent;
 import com.anysale.lead.adapters.in.rest.dto.BulkApplyResponseDto;
-import com.anysale.lead.adapters.in.rest.dto.LeadResponseDto;
+import com.anysale.lead.adapters.in.rest.dto.InteractionStatusUpdateRequest;
+import com.anysale.lead.adapters.in.rest.dto.LeadEnrichmentRequestDto;
 import com.anysale.lead.adapters.in.rest.dto.LeadSuggestionDto;
 import com.anysale.lead.adapters.in.rest.dto.StageChangedResponseDto;
 import com.anysale.lead.adapters.in.rest.maper.LeadMapper;
 import com.anysale.lead.adapters.out.messaging.LeadEventPublisher;
+import com.anysale.lead.adapters.out.persistence.InteractionJpaRepository;
 import com.anysale.lead.adapters.out.persistence.LeadJpaRepository;
 import com.anysale.lead.adapters.out.persistence.LeadSuggestionJpaRepository;
+import com.anysale.lead.domain.model.Interaction;
 import com.anysale.lead.domain.model.Lead;
 import com.anysale.lead.domain.model.LeadSuggestion;
 import org.springframework.data.domain.Page;
@@ -18,8 +21,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -31,13 +32,16 @@ public class LeadService {
 
     private final LeadJpaRepository leadRepo;
     private final LeadSuggestionJpaRepository suggestionRepo;
+    private final InteractionJpaRepository interactionRepo;
     private final LeadEventPublisher events;
 
     public LeadService(LeadJpaRepository leadRepo,
                        LeadSuggestionJpaRepository suggestionRepo,
+                       InteractionJpaRepository interactionRepo,
                        LeadEventPublisher events) {
         this.leadRepo = leadRepo;
         this.suggestionRepo = suggestionRepo;
+        this.interactionRepo = interactionRepo;
         this.events = events;
     }
 
@@ -47,7 +51,7 @@ public class LeadService {
         Lead lead = new Lead();
         lead.setName(name);
         lead.setEmail(email);
-        lead.setPhone(phone);
+        lead.setPhone(normalizePhone(phone));
         lead.setSource(source);
         lead.setDesiredCategory(desiredCategory);
         lead.setDesiredTags(desiredTags != null ? new ArrayList<>(desiredTags) : new ArrayList<>());
@@ -77,8 +81,88 @@ public class LeadService {
 
     @Transactional(readOnly = true)
     public Lead get(UUID id) {
-        return leadRepo.findById(id)
+        return leadRepo.findByIdWithTags(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lead not found: " + id));
+    }
+
+    @Transactional(readOnly = true)
+    public List<Interaction> listInteractions(UUID leadId) {
+        if (!leadRepo.existsById(leadId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Lead not found: " + leadId);
+        }
+        return interactionRepo.findByLead_IdOrderByCreatedAtAsc(leadId);
+    }
+
+    @Transactional
+    public Interaction recordOutboundInteraction(UUID leadId, com.anysale.lead.adapters.in.rest.dto.OutboundInteractionRequest request) {
+        Lead lead = leadRepo.findByIdWithTags(leadId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lead not found: " + leadId));
+
+        String normalizedChannel = normalizeChannel(request.channel());
+        String externalMessageId = trimToNull(request.externalMessageId());
+
+        if (externalMessageId != null) {
+            Optional<Interaction> existing = interactionRepo.findByChannelAndExternalMessageId(normalizedChannel, externalMessageId);
+            if (existing.isPresent()) {
+                return existing.get();
+            }
+        }
+
+        Interaction interaction = new Interaction();
+        interaction.setLead(lead);
+        interaction.setMessage(request.message().trim());
+        interaction.setChannel(normalizedChannel);
+        interaction.setDirection("OUT");
+        interaction.setExternalMessageId(externalMessageId);
+
+        Interaction saved = interactionRepo.save(interaction);
+
+        lead.setLastMessage(request.message().trim());
+        lead.setLastInteractionAt(Instant.now());
+        leadRepo.save(lead);
+
+        publishAfterCommitOrNow(() -> events.publishLeadUpdated(lead, "OUTBOUND_MESSAGE_SENT"));
+        return saved;
+    }
+
+    @Transactional
+    public void updateInteractionStatus(InteractionStatusUpdateRequest request) {
+        String normalizedChannel = normalizeChannel(request.channel());
+        String externalMessageId = trimToNull(request.externalMessageId());
+        String normalizedStatus = normalizeStatus(request.status());
+
+        if (normalizedChannel == null || externalMessageId == null || normalizedStatus == null) {
+            return;
+        }
+
+        Optional<Interaction> existing = interactionRepo.findByChannelAndExternalMessageId(normalizedChannel, externalMessageId);
+        if (existing.isEmpty()) {
+            return;
+        }
+
+        Interaction interaction = existing.get();
+        Instant statusTimestamp = request.statusTimestamp() != null ? request.statusTimestamp() : Instant.now();
+        Instant currentStatusTimestamp = interaction.getDeliveryStatusAt();
+        if (currentStatusTimestamp != null && statusTimestamp.isBefore(currentStatusTimestamp)) {
+            return;
+        }
+
+        interaction.setDeliveryStatus(normalizedStatus);
+        interaction.setDeliveryStatusAt(statusTimestamp);
+        interaction.setDeliveryRecipientId(trimToNull(request.recipientId()));
+
+        if ("FAILED".equals(normalizedStatus)) {
+            interaction.setDeliveryErrorCode(trimToNull(request.errorCode()));
+            interaction.setDeliveryErrorTitle(trimToNull(request.errorTitle()));
+            interaction.setDeliveryErrorMessage(trimToNull(request.errorMessage()));
+        } else {
+            interaction.setDeliveryErrorCode(null);
+            interaction.setDeliveryErrorTitle(null);
+            interaction.setDeliveryErrorMessage(null);
+        }
+
+        interactionRepo.save(interaction);
+        publishAfterCommitOrNow(() -> events.publishLeadUpdated(interaction.getLead(), "WHATSAPP_STATUS_" + normalizedStatus));
     }
 
 
@@ -92,6 +176,54 @@ public class LeadService {
 
     private String normalize(String s) {
         return (s == null || s.isBlank()) ? null : s.trim();
+    }
+
+    private String normalizeChannel(String channel) {
+        String normalized = normalize(channel);
+        return normalized == null ? null : normalized.toUpperCase();
+    }
+
+    private String normalizeStatus(String status) {
+        String normalized = normalize(status);
+        return normalized == null ? null : normalized.toUpperCase();
+    }
+
+    private String normalizePhone(String phone) {
+        String trimmed = normalize(phone);
+        if (trimmed == null) {
+            return null;
+        }
+        String digitsOnly = trimmed.replaceAll("\\D", "");
+        return digitsOnly.isBlank() ? trimmed : digitsOnly;
+    }
+
+    @Transactional
+    public Lead applyEnrichment(UUID leadId, LeadEnrichmentRequestDto request) {
+        Lead lead = leadRepo.findByIdWithTags(leadId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lead not found: " + leadId));
+
+        if (request.getSummary() != null) {
+            lead.setSummary(trimToNull(request.getSummary()));
+        }
+        if (request.getIntent() != null) {
+            lead.setIntent(trimToNull(request.getIntent()));
+        }
+        if (request.getDesiredCategory() != null) {
+            lead.setDesiredCategory(trimToNull(request.getDesiredCategory()));
+        }
+        if (request.getDesiredTags() != null) {
+            lead.setDesiredTags(sanitizeTags(request.getDesiredTags()));
+        }
+        if (request.getScore() != null) {
+            lead.setScore(request.getScore());
+        }
+        if (request.getNextAction() != null) {
+            lead.setNextAction(trimToNull(request.getNextAction()));
+        }
+
+        Lead saved = leadRepo.save(lead);
+        publishAfterCommitOrNow(() -> events.publishLeadUpdated(saved, "ENRICHMENT_UPDATED"));
+        return saved;
     }
 
 
@@ -173,10 +305,25 @@ public class LeadService {
                 .build();
     }
 
+    private String trimToNull(String value) {
+        String normalized = normalize(value);
+        return normalized == null ? null : normalized;
+    }
+
+    private List<String> sanitizeTags(List<String> tags) {
+        if (tags == null) {
+            return new ArrayList<>();
+        }
+        return tags.stream()
+                .map(this::trimToNull)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toCollection(ArrayList::new));
+    }
+
     private boolean isBlank(String s) { return s == null || s.isBlank(); }
 
     private void publishAfterCommitOrNow(Runnable r) {
-        // implemente conforme seu helper atual; se já tiver, remova este stub
         r.run();
     }
 
