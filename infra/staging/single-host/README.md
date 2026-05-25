@@ -14,6 +14,8 @@ This preset assumes:
 - `ingestion-gateway.env.example`
 - `notification-service.env.example`
 - `nginx-gateway.conf.example`
+- `systemd/*.service.example`
+- `deploy-linux.md`
 
 ## Recommended public URL
 
@@ -65,6 +67,13 @@ java -jar .\anysale-notification-service\target\anysale-notification-service-1.0
 9. Update the Meta webhook callback URL and subscribe:
    - `messages`
    - `statuses`
+
+## Linux host
+
+If your staging host is Linux with `systemd`, use:
+
+- `deploy-linux.md`
+- `systemd/*.service.example`
 
 ## Validation
 

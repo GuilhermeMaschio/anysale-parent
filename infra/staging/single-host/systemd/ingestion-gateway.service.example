@@ -1,0 +1,16 @@
+[Unit]
+Description=AnySale Ingestion Gateway
+After=network.target lead-service.service
+
+[Service]
+Type=simple
+User=anysale
+WorkingDirectory=/opt/anysale/ingestion-gateway
+EnvironmentFile=/opt/anysale/env/ingestion-gateway.env
+ExecStart=/usr/bin/java -jar /opt/anysale/ingestion-gateway/anysale-ingestion-gateway-1.0.0-SNAPSHOT.jar
+Restart=always
+RestartSec=5
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target

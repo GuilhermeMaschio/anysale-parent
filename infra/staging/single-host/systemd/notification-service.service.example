@@ -1,0 +1,16 @@
+[Unit]
+Description=AnySale Notification Service
+After=network.target lead-service.service
+
+[Service]
+Type=simple
+User=anysale
+WorkingDirectory=/opt/anysale/notification-service
+EnvironmentFile=/opt/anysale/env/notification-service.env
+ExecStart=/usr/bin/java -jar /opt/anysale/notification-service/anysale-notification-service-1.0.0-SNAPSHOT.jar
+Restart=always
+RestartSec=5
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target
