@@ -25,20 +25,27 @@ Replace `gateway-staging.example.com` with the real DNS name of your staging hos
 
 ## Boot sequence
 
-1. Copy the three `.env.example` files to `.env`
-2. Fill in secrets:
-   - database password
-   - `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
-   - `WHATSAPP_APP_SECRET`
-   - `WHATSAPP_PHONE_NUMBER_ID`
-   - `WHATSAPP_ACCESS_TOKEN`
-3. Build:
-
+1. The repository keeps only the versioned templates:
+   - `lead-service.env.example`
+   - `ingestion-gateway.env.example`
+   - `notification-service.env.example`
+2. In your staging host, create the real local files:
+   - `lead-service.env`
+   - `ingestion-gateway.env`
+   - `notification-service.env`
+3. Replace the remaining placeholder values:
+   - `WHATSAPP_WEBHOOK_VERIFY_TOKEN=SET_IN_META_AND_HERE`
+   - `WHATSAPP_APP_SECRET=ROTATE_AND_SET_ME`
+   - `WHATSAPP_ACCESS_TOKEN=ROTATE_AND_SET_ME`
+4. Replace the staging domain in:
+   - `nginx-gateway.conf`
+   - `nginx-gateway.conf.example`
+5. Build:
 ```powershell
 mvn -pl "anysale-lead-service,anysale-ingestion-gateway,anysale-notification-service" -am package -DskipTests
 ```
 
-4. Load env vars in one terminal per service:
+6. Load env vars in one terminal per service:
 
 ```powershell
 . .\infra\staging\Import-EnvFile.ps1 -Path .\infra\staging\single-host\lead-service.env
@@ -46,7 +53,7 @@ mvn -pl "anysale-lead-service,anysale-ingestion-gateway,anysale-notification-ser
 . .\infra\staging\Import-EnvFile.ps1 -Path .\infra\staging\single-host\notification-service.env
 ```
 
-5. Start the jars:
+7. Start the jars:
 
 ```powershell
 java -jar .\anysale-lead-service\target\anysale-lead-service-0.0.1-SNAPSHOT.jar
@@ -54,8 +61,8 @@ java -jar .\anysale-ingestion-gateway\target\anysale-ingestion-gateway-1.0.0-SNA
 java -jar .\anysale-notification-service\target\anysale-notification-service-1.0.0-SNAPSHOT.jar
 ```
 
-6. Apply the reverse proxy based on `nginx-gateway.conf.example`
-7. Update the Meta webhook callback URL and subscribe:
+8. Apply the reverse proxy based on `nginx-gateway.conf`
+9. Update the Meta webhook callback URL and subscribe:
    - `messages`
    - `statuses`
 
