@@ -24,4 +24,6 @@ public class LeadResponseDto {
     private String intent;
     private Integer score;
     private String nextAction;
+    private String suggestedReply;
+    private Instant suggestedReplyGeneratedAt;
 }

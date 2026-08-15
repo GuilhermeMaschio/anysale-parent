@@ -17,8 +17,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = LeadInboundController.class)
+@WebMvcTest(controllers = LeadInboundController.class, properties = "internal.auth.token=test-token")
 class LeadInboundControllerTest {
+    private static final String INTERNAL_TOKEN = "test-token";
 
     @Autowired
     private MockMvc mockMvc;
@@ -41,6 +42,7 @@ class LeadInboundControllerTest {
                         .build());
 
         mockMvc.perform(post("/v1/leads/incoming-message")
+                        .header("X-Internal-Token", INTERNAL_TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -56,5 +58,21 @@ class LeadInboundControllerTest {
                 .andExpect(jsonPath("$.stage").value("CONTACTED"));
 
         verify(handleIncomingMessageUseCase).execute(any());
+    }
+
+    @Test
+    void rejectsRequestWithoutInternalToken() throws Exception {
+        mockMvc.perform(post("/v1/leads/incoming-message")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "phone": "41999999999",
+                                  "leadName": "Guilherme",
+                                  "message": "Quero saber mais",
+                                  "channel": "WHATSAPP",
+                                  "externalMessageId": "msg-1"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
     }
 }

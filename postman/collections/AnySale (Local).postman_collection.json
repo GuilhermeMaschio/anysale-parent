@@ -33,6 +33,10 @@
       "value": ""
     },
     {
+      "key": "internalAuthToken",
+      "value": ""
+    },
+    {
       "key": "whatsappVerifyToken",
       "value": ""
     },
@@ -172,6 +176,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "X-Internal-Token",
+                "value": "{{internalAuthToken}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -200,6 +208,10 @@
           "request": {
             "method": "POST",
             "header": [
+              {
+                "key": "X-Internal-Token",
+                "value": "{{internalAuthToken}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -387,7 +399,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Internal-Token",
+                "value": "{{internalAuthToken}}"
+              }
+            ],
             "url": "{{leadServiceUrl}}/v1/leads/{{leadId}}"
           },
           "response": []
@@ -410,6 +427,10 @@
           "request": {
             "method": "POST",
             "header": [
+              {
+                "key": "X-Internal-Token",
+                "value": "{{internalAuthToken}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -439,7 +460,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Internal-Token",
+                "value": "{{internalAuthToken}}"
+              }
+            ],
             "url": "{{leadServiceUrl}}/v1/leads/{{leadId}}/interactions"
           },
           "response": []
@@ -463,6 +489,10 @@
             "method": "PATCH",
             "header": [
               {
+                "key": "X-Internal-Token",
+                "value": "{{internalAuthToken}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -472,6 +502,33 @@
               "raw": "{\n  \"summary\": \"Lead com alta intencao de compra buscando cadeira ergonomica para home office.\",\n  \"intent\": \"BUYING\",\n  \"desiredCategory\": \"home-office\",\n  \"desiredTags\": [\"cadeira\", \"ergonomica\", \"home-office\"],\n  \"score\": 92,\n  \"nextAction\": \"Enviar catalogo de cadeiras e oferecer atendimento humano.\"\n}"
             },
             "url": "{{leadServiceUrl}}/v1/leads/{{leadId}}/enrichment"
+          },
+          "response": []
+        },
+        {
+          "name": "Regenerate AI Enrichment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.response.to.have.status(200);",
+                  "const json = pm.response.json();",
+                  "pm.expect(json.suggestedReply).to.exist;"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Internal-Token",
+                "value": "{{internalAuthToken}}"
+              }
+            ],
+            "url": "{{leadServiceUrl}}/v1/leads/{{leadId}}/ai-enrichment"
           },
           "response": []
         },
@@ -491,6 +548,10 @@
           "request": {
             "method": "PATCH",
             "header": [
+              {
+                "key": "X-Internal-Token",
+                "value": "{{internalAuthToken}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -525,6 +586,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "X-Internal-Token",
+                "value": "{{internalAuthToken}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -534,6 +599,39 @@
               "raw": "{\n  \"leadId\": \"{{leadId}}\",\n  \"to\": \"{{whatsappRecipientPhone}}\",\n  \"message\": \"Oi, posso te ajudar com a cadeira ergonomica.\"\n}"
             },
             "url": "{{notificationServiceUrl}}/v1/notifications/whatsapp/messages"
+          },
+          "response": []
+        },
+        {
+          "name": "Send Suggested WhatsApp Message",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.response.to.have.status(200);",
+                  "const json = pm.response.json();",
+                  "pm.expect(json.status).to.eql('SENT');",
+                  "pm.expect(json.messageId).to.exist;",
+                  "pm.collectionVariables.set('whatsappMessageId', json.messageId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"leadId\": \"{{leadId}}\"\n}"
+            },
+            "url": "{{notificationServiceUrl}}/v1/notifications/whatsapp/messages/suggested"
           },
           "response": []
         },

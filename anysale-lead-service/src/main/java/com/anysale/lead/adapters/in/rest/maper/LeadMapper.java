@@ -35,6 +35,8 @@ public final class LeadMapper {
                 .intent(lead.getIntent())
                 .score(lead.getScore())
                 .nextAction(lead.getNextAction())
+                .suggestedReply(lead.getSuggestedReply())
+                .suggestedReplyGeneratedAt(lead.getSuggestedReplyGeneratedAt())
                 .build();
     }
 

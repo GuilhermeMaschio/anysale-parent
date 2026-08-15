@@ -2,14 +2,28 @@
 
 This document is the authoritative contract for the current WhatsApp + n8n MVP flow.
 
+## Shared Internal Token
+
+When `ANYSALE_INTERNAL_TOKEN` is configured, the protected automation endpoints below expect:
+
+`X-Internal-Token: <shared-token>`
+
+Use the same shared token in:
+- `anysale-ingestion-gateway`
+- `anysale-lead-service`
+- `anysale-notification-service`
+- `n8n` or any other trusted internal caller
+
+If `ANYSALE_INTERNAL_TOKEN` is blank, these checks stay disabled for local development.
+
 ## Recommended Flow
 
 1. Meta sends WhatsApp Cloud API webhooks directly to the gateway endpoint with the `messages` and `statuses` subscribed fields:
    `GET/POST http://localhost:8083/v1/whatsapp/webhook`
 2. The gateway validates the webhook challenge/signature, extracts text messages, normalizes them, and forwards outbound status updates to the lead service.
-3. The lead service creates or updates the lead, persists inbound and outbound interactions, and keeps delivery state attached to the same interaction via `externalMessageId`.
+3. The lead service creates or updates the lead, persists inbound and outbound interactions, keeps delivery state attached to the same interaction via `externalMessageId`, and regenerates the current AI draft from the conversation.
 4. The lead service updates:
-   `lastMessage`, `lastInteractionAt`, and `stage`.
+   `lastMessage`, `lastInteractionAt`, `stage`, `summary`, `intent`, `score`, `nextAction`, and `suggestedReply`.
 5. n8n can still be used for local testing or later downstream automations through the normalized gateway endpoint:
    `POST http://localhost:8083/v1/messages/incoming`
 6. n8n sends the AI result back to:
@@ -17,8 +31,9 @@ This document is the authoritative contract for the current WhatsApp + n8n MVP f
 7. n8n can fetch the latest lead state and the interaction history with:
    `GET http://localhost:8080/v1/leads/{leadId}`
    `GET http://localhost:8080/v1/leads/{leadId}/interactions`
-8. AnySale can send a manual WhatsApp response through:
+8. AnySale can send a manual WhatsApp response or the latest AI suggested reply through:
    `POST http://localhost:8081/v1/notifications/whatsapp/messages`
+   `POST http://localhost:8081/v1/notifications/whatsapp/messages/suggested`
 
 ## Endpoint Summary
 
@@ -109,6 +124,8 @@ Recommended external endpoint for n8n:
 Service:
 `anysale-ingestion-gateway`
 
+Protected with `X-Internal-Token` when `ANYSALE_INTERNAL_TOKEN` is configured.
+
 Request body:
 
 ```json
@@ -146,10 +163,12 @@ Response body:
     "stage": "CONTACTED",
     "lastMessage": "Quero saber mais sobre cadeira ergonomica",
     "lastInteractionAt": "2026-04-20T01:12:30Z",
-    "summary": null,
-    "intent": null,
-    "score": null,
-    "nextAction": null
+    "summary": "Lead inbound no WhatsApp pedindo detalhes sobre cadeira ergonomica.",
+    "intent": "BUYING",
+    "score": 85,
+    "nextAction": "Responder rapido no WhatsApp com opcoes e faixa de preco.",
+    "suggestedReply": "Oi! Posso te mandar algumas opcoes de cadeira ergonomica com preco e entrega.",
+    "suggestedReplyGeneratedAt": "2026-05-24T22:10:00Z"
   }
 }
 ```
@@ -162,6 +181,8 @@ Internal endpoint used by the gateway:
 
 Service:
 `anysale-lead-service`
+
+Protected with `X-Internal-Token` when `ANYSALE_INTERNAL_TOKEN` is configured.
 
 Request body:
 
@@ -189,10 +210,12 @@ Response body:
   "stage": "CONTACTED",
   "lastMessage": "Quero saber mais sobre cadeira ergonomica",
   "lastInteractionAt": "2026-04-20T01:12:30Z",
-  "summary": null,
-  "intent": null,
-  "score": null,
-  "nextAction": null
+  "summary": "Lead inbound no WhatsApp pedindo detalhes sobre cadeira ergonomica.",
+  "intent": "BUYING",
+  "score": 85,
+  "nextAction": "Responder rapido no WhatsApp com opcoes e faixa de preco.",
+  "suggestedReply": "Oi! Posso te mandar algumas opcoes de cadeira ergonomica com preco e entrega.",
+  "suggestedReplyGeneratedAt": "2026-05-24T22:10:00Z"
 }
 ```
 
@@ -211,6 +234,8 @@ Required runtime settings:
 - `WHATSAPP_GRAPH_API_VERSION`: optional Graph API version. Defaults to `v20.0`.
 - `WHATSAPP_GRAPH_API_BASE_URL`: optional Graph API base URL. Defaults to `https://graph.facebook.com`.
 - `LEAD_SERVICE_BASE_URL`: optional lead service base URL. Defaults to `http://localhost:8080`.
+
+Protected with `X-Internal-Token` when `ANYSALE_INTERNAL_TOKEN` is configured.
 
 Request body:
 
@@ -240,6 +265,48 @@ Current behavior:
 - If `leadId` is present, persists an `OUT` interaction in the lead service.
 - The returned `messageId` becomes the correlation key used later by Meta status webhooks.
 
+### Send Suggested WhatsApp Message
+
+Manual outbound endpoint that reuses the latest AI draft for the lead:
+
+`POST /v1/notifications/whatsapp/messages/suggested`
+
+Service:
+`anysale-notification-service`
+
+Protected with `X-Internal-Token` when `ANYSALE_INTERNAL_TOKEN` is configured.
+
+Request body:
+
+```json
+{
+  "leadId": "3c04b6f5-91e2-4524-bf0f-1f2ce58d0d3b",
+  "to": "5541999999999"
+}
+```
+
+Field rules:
+- `leadId`: required.
+- `to`: optional. If omitted, the notification service uses the lead phone from the CRM snapshot.
+
+Response body:
+
+```json
+{
+  "leadId": "3c04b6f5-91e2-4524-bf0f-1f2ce58d0d3b",
+  "to": "5541999999999",
+  "waId": "5541999999999",
+  "messageId": "wamid.HBgNNTU0MTk5OTk5OTk5ORUCABIYFDk4Rjc4AB",
+  "status": "SENT"
+}
+```
+
+Current behavior:
+- Fetches the latest lead snapshot from `GET /v1/leads/{leadId}`.
+- Uses `suggestedReply` as the outbound message body.
+- Returns `400 Bad Request` if the lead does not have a phone or a generated suggestion yet.
+- Persists the outbound interaction exactly like the manual text endpoint.
+
 ### 5. Record Outbound Interaction
 
 Internal endpoint used by the notification service after a successful WhatsApp send:
@@ -248,6 +315,8 @@ Internal endpoint used by the notification service after a successful WhatsApp s
 
 Service:
 `anysale-lead-service`
+
+Protected with `X-Internal-Token` when `ANYSALE_INTERNAL_TOKEN` is configured.
 
 Request body:
 
@@ -277,6 +346,36 @@ Current behavior:
 - `externalMessageId` is used as an idempotency key per channel.
 - Repeated calls with the same `channel` and `externalMessageId` return the existing interaction.
 
+### Regenerate AI Enrichment From Conversation
+
+`POST /v1/leads/{leadId}/ai-enrichment`
+
+Service:
+`anysale-lead-service`
+
+Protected with `X-Internal-Token` when `ANYSALE_INTERNAL_TOKEN` is configured.
+
+Response body:
+
+```json
+{
+  "id": "3c04b6f5-91e2-4524-bf0f-1f2ce58d0d3b",
+  "name": "Contato 5541999999999",
+  "phone": "5541999999999",
+  "stage": "CONTACTED",
+  "summary": "Lead com alta intencao de compra buscando cadeira ergonomica para home office.",
+  "intent": "BUYING",
+  "score": 92,
+  "nextAction": "Enviar catalogo e abrir atendimento humano.",
+  "suggestedReply": "Oi! Posso te mandar algumas opcoes de cadeira ergonomica com faixa de preco.",
+  "suggestedReplyGeneratedAt": "2026-05-24T22:10:00Z"
+}
+```
+
+Current behavior:
+- Rebuilds `summary`, `intent`, `desiredCategory`, `desiredTags`, `score`, `nextAction`, and `suggestedReply` from the saved conversation.
+- Updates `suggestedReplyGeneratedAt`.
+
 ### 6. Sync WhatsApp Delivery Status
 
 Internal endpoint used by the gateway after receiving a Meta status webhook:
@@ -285,6 +384,8 @@ Internal endpoint used by the gateway after receiving a Meta status webhook:
 
 Service:
 `anysale-lead-service`
+
+Protected with `X-Internal-Token` when `ANYSALE_INTERNAL_TOKEN` is configured.
 
 Request body:
 
@@ -313,6 +414,8 @@ Current behavior:
 
 Service:
 `anysale-lead-service`
+
+Protected with `X-Internal-Token` when `ANYSALE_INTERNAL_TOKEN` is configured.
 
 Request body:
 
@@ -358,7 +461,9 @@ Response body:
   "summary": "Lead com alta intencao de compra buscando cadeira ergonomica para home office.",
   "intent": "BUYING",
   "score": 92,
-  "nextAction": "Enviar catalogo de cadeiras e oferecer atendimento humano."
+  "nextAction": "Enviar catalogo de cadeiras e oferecer atendimento humano.",
+  "suggestedReply": "Oi! Posso te mandar algumas opcoes de cadeira ergonomica com faixa de preco.",
+  "suggestedReplyGeneratedAt": "2026-05-24T22:10:00Z"
 }
 ```
 
@@ -368,6 +473,8 @@ Response body:
 
 Service:
 `anysale-lead-service`
+
+Protected with `X-Internal-Token` when `ANYSALE_INTERNAL_TOKEN` is configured.
 
 Example response:
 
@@ -400,6 +507,8 @@ Example response:
 
 Service:
 `anysale-lead-service`
+
+Protected with `X-Internal-Token` when `ANYSALE_INTERNAL_TOKEN` is configured.
 
 Example response:
 

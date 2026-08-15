@@ -39,6 +39,12 @@ public class Lead {
     @Column(name = "next_action", length = 500)
     private String nextAction;
 
+    @Column(name = "suggested_reply", length = 2000)
+    private String suggestedReply;
+
+    @Column(name = "suggested_reply_generated_at")
+    private Instant suggestedReplyGeneratedAt;
+
     // coleção de tags em tabela própria
     @ElementCollection
     @CollectionTable(name = "lead_desired_tag", joinColumns = @JoinColumn(name = "lead_id"))
@@ -88,6 +94,10 @@ public class Lead {
     public void setScore(Integer score) { this.score = score; }
     public String getNextAction() { return nextAction; }
     public void setNextAction(String nextAction) { this.nextAction = nextAction; }
+    public String getSuggestedReply() { return suggestedReply; }
+    public void setSuggestedReply(String suggestedReply) { this.suggestedReply = suggestedReply; }
+    public Instant getSuggestedReplyGeneratedAt() { return suggestedReplyGeneratedAt; }
+    public void setSuggestedReplyGeneratedAt(Instant suggestedReplyGeneratedAt) { this.suggestedReplyGeneratedAt = suggestedReplyGeneratedAt; }
     public List<String> getDesiredTags() { return desiredTags; }
     public void setDesiredTags(List<String> desiredTags) { this.desiredTags = desiredTags; }
     public Instant getCreatedAt() { return createdAt; }

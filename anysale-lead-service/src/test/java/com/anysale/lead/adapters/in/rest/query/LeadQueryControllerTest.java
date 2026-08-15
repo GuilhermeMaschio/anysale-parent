@@ -19,8 +19,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = LeadQueryController.class)
+@WebMvcTest(controllers = LeadQueryController.class, properties = "internal.auth.token=test-token")
 class LeadQueryControllerTest {
+
+    private static final String INTERNAL_TOKEN = "test-token";
 
     @Autowired
     private MockMvc mockMvc;
@@ -37,23 +39,24 @@ class LeadQueryControllerTest {
         Lead lead = new Lead();
         lead.setId(leadId);
         lead.setName("Contato 41999999999");
-        lead.setDesiredTags(List.of("cadeira", "ergonômica"));
+        lead.setDesiredTags(List.of("cadeira", "ergonomica"));
         lead.setLastMessage("Quero saber mais");
         lead.setLastInteractionAt(Instant.parse("2026-04-18T10:15:30Z"));
         lead.setSummary("Cliente buscando cadeira para home office");
         lead.setIntent("BUYING");
         lead.setScore(90);
-        lead.setNextAction("Enviar catálogo");
+        lead.setNextAction("Enviar catalogo");
 
         when(leadService.get(leadId)).thenReturn(lead);
 
-        mockMvc.perform(get("/v1/leads/{id}", leadId))
+        mockMvc.perform(get("/v1/leads/{id}", leadId)
+                        .header("X-Internal-Token", INTERNAL_TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.lastMessage").value("Quero saber mais"))
                 .andExpect(jsonPath("$.summary").value("Cliente buscando cadeira para home office"))
                 .andExpect(jsonPath("$.intent").value("BUYING"))
                 .andExpect(jsonPath("$.score").value(90))
-                .andExpect(jsonPath("$.nextAction").value("Enviar catálogo"));
+                .andExpect(jsonPath("$.nextAction").value("Enviar catalogo"));
     }
 
     @Test
@@ -61,7 +64,7 @@ class LeadQueryControllerTest {
         UUID leadId = UUID.randomUUID();
         Interaction first = new Interaction();
         first.setId(UUID.randomUUID());
-        first.setMessage("Olá");
+        first.setMessage("Ola");
         first.setChannel("WHATSAPP");
         first.setDirection("IN");
         first.setExternalMessageId("msg-1");
@@ -69,7 +72,7 @@ class LeadQueryControllerTest {
 
         Interaction second = new Interaction();
         second.setId(UUID.randomUUID());
-        second.setMessage("Quero um orçamento");
+        second.setMessage("Quero um orcamento");
         second.setChannel("WHATSAPP");
         second.setDirection("IN");
         second.setExternalMessageId("msg-2");
@@ -77,11 +80,18 @@ class LeadQueryControllerTest {
 
         when(leadService.listInteractions(leadId)).thenReturn(List.of(first, second));
 
-        mockMvc.perform(get("/v1/leads/{id}/interactions", leadId))
+        mockMvc.perform(get("/v1/leads/{id}/interactions", leadId)
+                        .header("X-Internal-Token", INTERNAL_TOKEN))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].message").value("Olá"))
+                .andExpect(jsonPath("$[0].message").value("Ola"))
                 .andExpect(jsonPath("$[0].channel").value("WHATSAPP"))
-                .andExpect(jsonPath("$[1].message").value("Quero um orçamento"))
+                .andExpect(jsonPath("$[1].message").value("Quero um orcamento"))
                 .andExpect(jsonPath("$[1].externalMessageId").value("msg-2"));
+    }
+
+    @Test
+    void getRejectsRequestWithoutInternalToken() throws Exception {
+        mockMvc.perform(get("/v1/leads/{id}", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
     }
 }

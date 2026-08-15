@@ -3,7 +3,9 @@ package com.anysale.lead.adapters.in.rest.command;
 import com.anysale.lead.adapters.in.rest.dto.*;
 import com.anysale.lead.adapters.in.rest.maper.LeadMapper;
 import com.anysale.lead.aplication.LeadService; // seu service atual
+import com.anysale.lead.aplication.service.LeadAiService;
 import com.anysale.lead.domain.model.Lead;
+import com.anysale.lead.internalauth.InternalTokenProtected;
 import com.anysale.lead.idempotency.Idempotent;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -18,7 +20,12 @@ import java.util.UUID;
 public class LeadCommandController {
 
     private final LeadService service;
-    public LeadCommandController(LeadService service) { this.service = service; }
+    private final LeadAiService leadAiService;
+
+    public LeadCommandController(LeadService service, LeadAiService leadAiService) {
+        this.service = service;
+        this.leadAiService = leadAiService;
+    }
 
     /**
      * Idempotente via header Idempotency-Key (ver Interceptor/Advice).
@@ -84,6 +91,7 @@ public class LeadCommandController {
     }
 
     @PatchMapping("/{id}/enrichment")
+    @InternalTokenProtected
     public ResponseEntity<LeadResponseDto> enrich(
             @PathVariable UUID id,
             @Valid @RequestBody LeadEnrichmentRequestDto body) {
@@ -97,7 +105,20 @@ public class LeadCommandController {
                 .body(response);
     }
 
+    @PostMapping("/{id}/ai-enrichment")
+    @InternalTokenProtected
+    public ResponseEntity<LeadResponseDto> regenerateAiEnrichment(@PathVariable UUID id) {
+        Lead saved = leadAiService.enrichLeadFromConversation(id);
+        LeadResponseDto response = LeadMapper.toResponse(saved);
+
+        return ResponseEntity.ok()
+                .location(URI.create("/v1/leads/" + id))
+                .eTag("\"" + saved.getUpdatedAt().toEpochMilli() + "\"")
+                .body(response);
+    }
+
     @PostMapping("/{id}/interactions/outbound")
+    @InternalTokenProtected
     public ResponseEntity<InteractionResponseDto> recordOutboundInteraction(
             @PathVariable UUID id,
             @Valid @RequestBody OutboundInteractionRequest body) {
@@ -110,6 +131,7 @@ public class LeadCommandController {
     }
 
     @PostMapping("/interactions/status")
+    @InternalTokenProtected
     public ResponseEntity<Void> updateInteractionStatus(
             @Valid @RequestBody InteractionStatusUpdateRequest body) {
 

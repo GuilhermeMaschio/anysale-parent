@@ -26,6 +26,8 @@ public class LeadSnapshot {
     private String intent;
     private Integer score;
     private String nextAction;
+    private String suggestedReply;
+    private Instant suggestedReplyGeneratedAt;
 
     public UUID id() {
         return id;
