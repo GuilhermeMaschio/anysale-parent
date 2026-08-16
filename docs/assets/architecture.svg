@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="690" viewBox="0 0 1200 690" role="img" aria-labelledby="title desc">
+  <title id="title">Arquitetura e fluxos reais do AnySale</title><desc id="desc">Entrada por Meta ou n8n, persistencia e analise no Lead Service, eventos para catalogo e notificacao, e envio manual pelo Notification Service.</desc>
+  <style>.svc{fill:#eff6ff;stroke:#2563eb;stroke-width:2}.store{fill:#ecfdf5;stroke:#059669;stroke-width:2}.event{fill:#fff7ed;stroke:#ea580c;stroke-width:2}.external{fill:#f8fafc;stroke:#475569;stroke-width:2}.t{font:600 15px Arial;fill:#172554}.s{font:12px Arial;fill:#334155}.h{font:700 17px Arial;fill:#0f172a}.solid{stroke:#475569;stroke-width:2;marker-end:url(#arrow)}.dash{stroke:#ea580c;stroke-width:2;stroke-dasharray:7 5;marker-end:url(#orange)}</style>
+  <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L0 6 L9 3z" fill="#475569"/></marker><marker id="orange" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L0 6 L9 3z" fill="#ea580c"/></marker></defs>
+  <text class="h" x="30" y="32">1. Entrada e analise da conversa</text>
+  <rect class="external" x="30" y="60" width="135" height="58" rx="9"/><text class="t" x="97" y="84" text-anchor="middle">Cliente</text><text class="s" x="97" y="103" text-anchor="middle">WhatsApp</text>
+  <rect class="external" x="215" y="60" width="155" height="58" rx="9"/><text class="t" x="292" y="84" text-anchor="middle">WhatsApp Cloud API</text><text class="s" x="292" y="103" text-anchor="middle">Meta</text>
+  <rect class="svc" x="430" y="60" width="185" height="58" rx="9"/><text class="t" x="522" y="84" text-anchor="middle">Ingestion Gateway</text><text class="s" x="522" y="103" text-anchor="middle">webhook e normalizacao</text>
+  <rect class="svc" x="685" y="60" width="190" height="58" rx="9"/><text class="t" x="780" y="84" text-anchor="middle">Lead Service</text><text class="s" x="780" y="103" text-anchor="middle">lead, interacoes e analise</text>
+  <rect class="store" x="945" y="60" width="180" height="58" rx="9"/><text class="t" x="1035" y="84" text-anchor="middle">PostgreSQL</text><text class="s" x="1035" y="103" text-anchor="middle">leads e timeline</text>
+  <path class="solid" d="M165 89H215M370 89H430M615 89H685M875 89H945"/>
+  <text class="s" x="392" y="79" text-anchor="middle">messages e statuses</text><text class="s" x="650" y="79" text-anchor="middle">HTTP</text>
+  <rect class="external" x="30" y="155" width="135" height="58" rx="9"/><text class="t" x="97" y="179" text-anchor="middle">n8n</text><text class="s" x="97" y="198" text-anchor="middle">automacao opcional</text>
+  <path class="solid" d="M165 184H360V118"/><text class="s" x="255" y="176" text-anchor="middle">POST messages/incoming</text>
+  <text class="h" x="30" y="278">2. Eventos e recomendacao de catalogo</text>
+  <rect class="event" x="435" y="305" width="170" height="60" rx="9"/><text class="t" x="520" y="330" text-anchor="middle">Kafka</text><text class="s" x="520" y="349" text-anchor="middle">lead.created e lead.updated</text>
+  <rect class="svc" x="710" y="305" width="175" height="60" rx="9"/><text class="t" x="797" y="330" text-anchor="middle">Catalog Service</text><text class="s" x="797" y="349" text-anchor="middle">calcula top 3 produtos</text>
+  <rect class="store" x="965" y="305" width="160" height="60" rx="9"/><text class="t" x="1045" y="330" text-anchor="middle">MongoDB</text><text class="s" x="1045" y="349" text-anchor="middle">catalogo</text>
+  <rect class="svc" x="710" y="420" width="175" height="60" rx="9"/><text class="t" x="797" y="445" text-anchor="middle">Notification Service</text><text class="s" x="797" y="464" text-anchor="middle">historico em memoria</text>
+  <path class="dash" d="M780 118V250H520V305"/><text class="s" x="650" y="242" text-anchor="middle">publica eventos apos persistir</text>
+  <path class="dash" d="M605 335H710M885 335H965M520 365V450H710"/><text class="s" x="655" y="440" text-anchor="middle">lead.updated</text>
+  <path class="solid" d="M797 365V395H650V118"/><text class="s" x="708" y="387" text-anchor="middle">PATCH suggestions</text>
+  <text class="h" x="30" y="545">3. Resposta aprovada e status de entrega</text>
+  <rect class="external" x="30" y="575" width="155" height="58" rx="9"/><text class="t" x="107" y="599" text-anchor="middle">Operador ou n8n</text><text class="s" x="107" y="618" text-anchor="middle">acao deliberada</text>
+  <rect class="svc" x="270" y="575" width="190" height="58" rx="9"/><text class="t" x="365" y="599" text-anchor="middle">Notification Service</text><text class="s" x="365" y="618" text-anchor="middle">POST messages/suggested</text>
+  <rect class="svc" x="545" y="575" width="155" height="58" rx="9"/><text class="t" x="622" y="599" text-anchor="middle">Lead Service</text><text class="s" x="622" y="618" text-anchor="middle">consulta suggestedReply</text>
+  <rect class="external" x="790" y="575" width="175" height="58" rx="9"/><text class="t" x="877" y="599" text-anchor="middle">WhatsApp Cloud API</text><text class="s" x="877" y="618" text-anchor="middle">envia mensagem</text>
+  <path class="solid" d="M185 604H270M460 604H545M700 604H790"/>
+  <path class="solid" d="M877 575V525H522V118"/><text class="s" x="710" y="516" text-anchor="middle">status callback: sent, delivered, read ou failed</text>
+  <line x1="990" y1="665" x2="1040" y2="665" class="solid"/><text class="s" x="1052" y="669">HTTP</text><line x1="990" y1="680" x2="1040" y2="680" class="dash"/><text class="s" x="1052" y="684">Kafka</text>
+</svg>
