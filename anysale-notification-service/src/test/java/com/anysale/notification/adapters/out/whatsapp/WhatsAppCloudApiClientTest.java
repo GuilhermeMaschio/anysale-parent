@@ -2,6 +2,7 @@ package com.anysale.notification.adapters.out.whatsapp;
 
 import com.anysale.notification.adapters.out.whatsapp.dto.WhatsAppSendMessageResponse;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -9,6 +10,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
@@ -67,5 +69,21 @@ class WhatsAppCloudApiClientTest {
         assertThat(response.firstWaId()).isEqualTo("5541999999999");
         assertThat(response.firstMessageId()).isEqualTo("wamid.outbound.001");
         server.verify();
+    }
+
+    @Test
+    void reportsServiceUnavailableWhenPhoneNumberIdIsMissing() {
+        WhatsAppCloudApiClient client = new WhatsAppCloudApiClient(
+                RestClient.builder().baseUrl("https://graph.facebook.com").build(),
+                "v20.0",
+                " ",
+                "token"
+        );
+
+        assertThatThrownBy(() -> client.sendTextMessage("5541999999999", "Oi"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, exception -> {
+                    assertThat(exception.getStatusCode().value()).isEqualTo(503);
+                    assertThat(exception.getReason()).contains("WHATSAPP_PHONE_NUMBER_ID");
+                });
     }
 }

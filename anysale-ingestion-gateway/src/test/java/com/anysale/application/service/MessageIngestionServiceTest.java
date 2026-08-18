@@ -43,24 +43,16 @@ class MessageIngestionServiceTest {
                 "msg-1"
         );
 
-        when(leadGatewayPort.createOrUpdateLeadFromIncomingMessage(any())).thenReturn(Mono.just(
-                new LeadSnapshot(
-                        LEAD_ID,
-                        "Guilherme",
-                        null,
-                        "5541999999999",
-                        "WHATSAPP",
-                        null,
-                        java.util.List.of(),
-                        "CONTACTED",
-                        "Quero saber mais",
-                        null,
-                        null,
-                        null,
-                        null,
-                        null
-                )
-        ));
+        LeadSnapshot leadSnapshot = new LeadSnapshot();
+        leadSnapshot.setId(LEAD_ID);
+        leadSnapshot.setName("Guilherme");
+        leadSnapshot.setPhone("5541999999999");
+        leadSnapshot.setSource("WHATSAPP");
+        leadSnapshot.setDesiredTags(java.util.List.of());
+        leadSnapshot.setStage("CONTACTED");
+        leadSnapshot.setLastMessage("Quero saber mais");
+
+        when(leadGatewayPort.createOrUpdateLeadFromIncomingMessage(any())).thenReturn(Mono.just(leadSnapshot));
 
         IncomingMessageResponse response = service.execute(request).block();
 

@@ -28,6 +28,7 @@ public class LeadInboundService implements HandleIncomingMessageUseCase {
     private final LeadJpaRepository leadRepository;
     private final InteractionJpaRepository interactionRepository;
     private final LeadEventPublisher leadEventPublisher;
+    private final LeadAiService leadAiService;
 
     @Override
     @Transactional
@@ -63,13 +64,14 @@ public class LeadInboundService implements HandleIncomingMessageUseCase {
             throw ex;
         }
 
-        if (leadResolution.created()) {
-            leadEventPublisher.publishLeadCreated(leadResolution.lead());
-        }
-        leadEventPublisher.publishLeadUpdated(leadResolution.lead(), "INCOMING_MESSAGE_RECEIVED");
+        Lead enrichedLead = leadAiService.enrichLeadFromConversation(leadResolution.lead().getId());
 
-        // TODO plug AI classification/scoring/auto-response from this flow.
-        return LeadMapper.toResponse(leadResolution.lead());
+        if (leadResolution.created()) {
+            leadEventPublisher.publishLeadCreated(enrichedLead);
+        }
+        leadEventPublisher.publishLeadUpdated(enrichedLead, "INCOMING_MESSAGE_RECEIVED");
+
+        return LeadMapper.toResponse(enrichedLead);
     }
 
     private LeadResolution resolveLead(IncomingMessageRequest request, String normalizedPhone, String normalizedChannel) {

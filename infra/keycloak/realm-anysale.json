@@ -1,0 +1,29 @@
+{
+  "realm": "anysale-realm",
+  "enabled": true,
+  "displayName": "AnySale",
+  "loginTheme": "anysale",
+  "roles": {
+    "realm": [
+      { "name": "SALES_AGENT", "description": "Can work assigned leads and send WhatsApp messages." },
+      { "name": "SALES_MANAGER", "description": "Can manage the sales operation." },
+      { "name": "ADMIN", "description": "Can administer the AnySale platform." }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "anysale-console",
+      "name": "AnySale Console",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:5173"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    }
+  ]
+}

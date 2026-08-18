@@ -38,6 +38,9 @@ class LeadInboundServiceTest {
     @Mock
     private LeadEventPublisher leadEventPublisher;
 
+    @Mock
+    private LeadAiService leadAiService;
+
     @InjectMocks
     private LeadInboundService service;
 
@@ -61,6 +64,8 @@ class LeadInboundServiceTest {
             }
             return lead;
         });
+        when(leadAiService.enrichLeadFromConversation(any(UUID.class)))
+                .thenAnswer(invocation -> savedLeadWithSuggestion(invocation.getArgument(0), "Guilherme"));
 
         LeadResponseDto response = service.execute(request);
 
@@ -75,6 +80,7 @@ class LeadInboundServiceTest {
         assertThat(savedLead.getLastInteractionAt()).isNotNull();
         assertThat(response.getId()).isEqualTo(savedLead.getId());
         assertThat(response.getStage()).isEqualTo("CONTACTED");
+        assertThat(response.getSuggestedReply()).isEqualTo("Sugestao inicial");
 
         ArgumentCaptor<Interaction> interactionCaptor = ArgumentCaptor.forClass(Interaction.class);
         verify(interactionRepository).save(interactionCaptor.capture());
@@ -84,8 +90,9 @@ class LeadInboundServiceTest {
         assertThat(interaction.getDirection()).isEqualTo("IN");
         assertThat(interaction.getExternalMessageId()).isEqualTo("msg-1");
 
-        verify(leadEventPublisher).publishLeadCreated(savedLead);
-        verify(leadEventPublisher).publishLeadUpdated(savedLead, "INCOMING_MESSAGE_RECEIVED");
+        verify(leadAiService).enrichLeadFromConversation(savedLead.getId());
+        verify(leadEventPublisher).publishLeadCreated(any(Lead.class));
+        verify(leadEventPublisher).publishLeadUpdated(any(Lead.class), eq("INCOMING_MESSAGE_RECEIVED"));
     }
 
     @Test
@@ -107,6 +114,10 @@ class LeadInboundServiceTest {
 
         when(leadRepository.findAllByNormalizedPhone("41999999999")).thenReturn(List.of(existingLead));
         when(leadRepository.save(any(Lead.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(leadAiService.enrichLeadFromConversation(existingLead.getId())).thenAnswer(invocation -> {
+            existingLead.setSuggestedReply("Sugestao existente");
+            return existingLead;
+        });
 
         LeadResponseDto response = service.execute(request);
 
@@ -117,6 +128,7 @@ class LeadInboundServiceTest {
         assertThat(existingLead.getLastMessage()).isEqualTo("Mensagem recebida");
         assertThat(response.getId()).isEqualTo(existingLead.getId());
         assertThat(response.getLastMessage()).isEqualTo("Mensagem recebida");
+        assertThat(response.getSuggestedReply()).isEqualTo("Sugestao existente");
 
         verify(leadEventPublisher, never()).publishLeadCreated(any(Lead.class));
         verify(leadEventPublisher).publishLeadUpdated(existingLead, "INCOMING_MESSAGE_RECEIVED");
@@ -161,7 +173,15 @@ class LeadInboundServiceTest {
         );
 
         when(leadRepository.findAllByNormalizedPhone("41999999999")).thenReturn(List.of());
-        when(leadRepository.save(any(Lead.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(leadRepository.save(any(Lead.class))).thenAnswer(invocation -> {
+            Lead lead = invocation.getArgument(0);
+            if (lead.getId() == null) {
+                lead.setId(UUID.randomUUID());
+            }
+            return lead;
+        });
+        when(leadAiService.enrichLeadFromConversation(any(UUID.class)))
+                .thenAnswer(invocation -> savedLeadWithSuggestion(invocation.getArgument(0), "Contato 41999999999"));
 
         LeadResponseDto response = service.execute(request);
 
@@ -169,5 +189,14 @@ class LeadInboundServiceTest {
         verify(leadRepository).save(leadCaptor.capture());
         assertThat(leadCaptor.getValue().getName()).isEqualTo("Contato 41999999999");
         assertThat(response.getName()).isEqualTo("Contato 41999999999");
+    }
+
+    private Lead savedLeadWithSuggestion(UUID leadId, String name) {
+        Lead lead = new Lead();
+        lead.setId(leadId);
+        lead.setName(name);
+        lead.setStage("CONTACTED");
+        lead.setSuggestedReply("Sugestao inicial");
+        return lead;
     }
 }

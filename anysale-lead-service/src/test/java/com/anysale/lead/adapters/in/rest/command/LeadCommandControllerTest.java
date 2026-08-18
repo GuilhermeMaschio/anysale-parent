@@ -1,12 +1,17 @@
 package com.anysale.lead.adapters.in.rest.command;
 
 import com.anysale.lead.aplication.LeadService;
+import com.anysale.lead.aplication.LeadWhatsAppService;
+import com.anysale.lead.adapters.in.rest.dto.SendLeadWhatsAppMessageResponse;
+import com.anysale.lead.aplication.service.LeadAiService;
 import com.anysale.lead.domain.model.Interaction;
 import com.anysale.lead.domain.model.Lead;
 import com.anysale.lead.idempotency.IdempotencyService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import com.anysale.lead.config.LocalSecurityConfig;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -24,14 +29,22 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = LeadCommandController.class)
+@WebMvcTest(controllers = LeadCommandController.class, properties = "internal.auth.token=test-token")
+@Import(LocalSecurityConfig.class)
 class LeadCommandControllerTest {
+    private static final String INTERNAL_TOKEN = "test-token";
 
     @Autowired
     private MockMvc mockMvc;
 
     @MockBean
     private LeadService leadService;
+
+    @MockBean
+    private LeadAiService leadAiService;
+
+    @MockBean
+    private LeadWhatsAppService leadWhatsAppService;
 
     @MockBean
     private IdempotencyService idempotencyService;
@@ -55,6 +68,7 @@ class LeadCommandControllerTest {
         when(leadService.applyEnrichment(eq(leadId), any())).thenReturn(lead);
 
         mockMvc.perform(patch("/v1/leads/{id}/enrichment", leadId)
+                        .header("X-Internal-Token", INTERNAL_TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -90,6 +104,7 @@ class LeadCommandControllerTest {
         when(leadService.recordOutboundInteraction(eq(leadId), any())).thenReturn(interaction);
 
         mockMvc.perform(post("/v1/leads/{id}/interactions/outbound", leadId)
+                        .header("X-Internal-Token", INTERNAL_TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -107,8 +122,31 @@ class LeadCommandControllerTest {
     }
 
     @Test
+    void sendsWhatsAppMessageUsingTheLeadDestination() throws Exception {
+        UUID leadId = UUID.randomUUID();
+        when(leadWhatsAppService.send(eq(leadId), any())).thenReturn(
+                new SendLeadWhatsAppMessageResponse(
+                        leadId, "5541999999999", "5541999999999", "wamid.outbound.001", "SENT"
+                )
+        );
+
+        mockMvc.perform(post("/v1/leads/{id}/whatsapp/messages", leadId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "message": "Oi, posso te ajudar?" }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.leadId").value(leadId.toString()))
+                .andExpect(jsonPath("$.messageId").value("wamid.outbound.001"))
+                .andExpect(jsonPath("$.status").value("SENT"));
+
+        verify(leadWhatsAppService).send(eq(leadId), any());
+    }
+
+    @Test
     void updateInteractionStatusReturnsNoContent() throws Exception {
         mockMvc.perform(post("/v1/leads/interactions/status")
+                        .header("X-Internal-Token", INTERNAL_TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -122,5 +160,42 @@ class LeadCommandControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(leadService).updateInteractionStatus(any());
+    }
+
+    @Test
+    void regenerateAiEnrichmentReturnsUpdatedLead() throws Exception {
+        UUID leadId = UUID.randomUUID();
+        Lead lead = new Lead();
+        lead.setId(leadId);
+        lead.setName("Contato 41999999999");
+        lead.setSummary("Resumo de IA");
+        lead.setIntent("BUYING");
+        lead.setScore(90);
+        lead.setNextAction("Responder no WhatsApp");
+        lead.setSuggestedReply("Oi! Posso te mandar algumas opcoes.");
+        lead.setUpdatedAt(Instant.parse("2026-05-24T22:00:00Z"));
+
+        when(leadAiService.enrichLeadFromConversation(leadId)).thenReturn(lead);
+
+        mockMvc.perform(post("/v1/leads/{id}/ai-enrichment", leadId)
+                        .header("X-Internal-Token", INTERNAL_TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.summary").value("Resumo de IA"))
+                .andExpect(jsonPath("$.intent").value("BUYING"))
+                .andExpect(jsonPath("$.suggestedReply").value("Oi! Posso te mandar algumas opcoes."));
+
+        verify(leadAiService).enrichLeadFromConversation(leadId);
+    }
+
+    @Test
+    void enrichRejectsRequestWithoutInternalToken() throws Exception {
+        mockMvc.perform(patch("/v1/leads/{id}/enrichment", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "intent": "BUYING"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
     }
 }
