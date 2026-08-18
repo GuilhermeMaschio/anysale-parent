@@ -5,10 +5,12 @@ import com.anysale.notification.adapters.out.whatsapp.dto.WhatsAppSendMessageRes
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.server.ResponseStatusException;
 
 @Component
 public class WhatsAppCloudApiClient {
@@ -46,10 +48,17 @@ public class WhatsAppCloudApiClient {
 
     private void ensureConfigured() {
         if (!StringUtils.hasText(phoneNumberId)) {
-            throw new IllegalStateException("WHATSAPP_PHONE_NUMBER_ID is required to send WhatsApp messages");
+            throw outboundNotConfigured("WHATSAPP_PHONE_NUMBER_ID");
         }
         if (!StringUtils.hasText(accessToken)) {
-            throw new IllegalStateException("WHATSAPP_ACCESS_TOKEN is required to send WhatsApp messages");
+            throw outboundNotConfigured("WHATSAPP_ACCESS_TOKEN");
         }
+    }
+
+    private ResponseStatusException outboundNotConfigured(String missingSetting) {
+        return new ResponseStatusException(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "WhatsApp outbound is not configured: " + missingSetting + " is required"
+        );
     }
 }

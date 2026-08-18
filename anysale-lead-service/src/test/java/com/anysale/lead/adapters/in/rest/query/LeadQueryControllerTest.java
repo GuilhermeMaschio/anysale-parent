@@ -89,9 +89,4 @@ class LeadQueryControllerTest {
                 .andExpect(jsonPath("$[1].externalMessageId").value("msg-2"));
     }
 
-    @Test
-    void getRejectsRequestWithoutInternalToken() throws Exception {
-        mockMvc.perform(get("/v1/leads/{id}", UUID.randomUUID()))
-                .andExpect(status().isUnauthorized());
-    }
 }

@@ -6,10 +6,10 @@ import com.anysale.lead.adapters.in.rest.maper.LeadMapper;
 import com.anysale.lead.aplication.LeadService;
 import com.anysale.lead.domain.model.Interaction;
 import com.anysale.lead.domain.model.Lead;
-import com.anysale.lead.internalauth.InternalTokenProtected;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -22,13 +22,11 @@ public class LeadQueryController {
     public LeadQueryController(LeadService service) { this.service = service; }
 
     @GetMapping("/{id}")
-    @InternalTokenProtected
     public LeadResponseDto get(@PathVariable UUID id) {
         return LeadMapper.toResponse(service.get(id));
     }
 
     @GetMapping("/{id}/interactions")
-    @InternalTokenProtected
     public List<InteractionResponseDto> interactions(@PathVariable UUID id) {
         List<Interaction> interactions = service.listInteractions(id);
         return interactions.stream()
@@ -36,7 +34,13 @@ public class LeadQueryController {
                 .toList();
     }
 
+    @GetMapping("/{id}/stage-history")
+    public List<com.anysale.lead.adapters.in.rest.dto.LeadStageHistoryResponseDto> stageHistory(@PathVariable UUID id) {
+        return service.listStageHistory(id).stream().map(LeadMapper::toStageHistoryResponse).toList();
+    }
+
     @GetMapping
+    @Transactional(readOnly = true)
     public Page<LeadResponseDto> list(
             @RequestParam(required = false) String stage,
             @RequestParam(required = false) String q,

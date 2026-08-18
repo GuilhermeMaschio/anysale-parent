@@ -11,6 +11,10 @@ import java.util.UUID;
 
 public interface LeadJpaRepository extends JpaRepository<Lead, UUID> {
 
+    @Override
+    @EntityGraph(attributePaths = "desiredTags")
+    Page<Lead> findAll(Pageable pageable);
+
     @EntityGraph(attributePaths = "desiredTags")
     @Query("""
          SELECT l FROM Lead l

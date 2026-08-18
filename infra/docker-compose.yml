@@ -54,6 +54,21 @@ services:
     volumes:
       - n8n_data:/home/node/.n8n
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.1
+    container_name: keycloak-anysale
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+    ports:
+      - "8180:8080"
+    volumes:
+      - ./keycloak/realm-anysale.json:/opt/keycloak/data/import/realm-anysale.json:ro
+      - ./keycloak/themes/anysale:/opt/keycloak/themes/anysale:ro
+      - keycloak_data:/opt/keycloak/data
+
 volumes:
   pgdata: {}
   n8n_data: {}
+  keycloak_data: {}

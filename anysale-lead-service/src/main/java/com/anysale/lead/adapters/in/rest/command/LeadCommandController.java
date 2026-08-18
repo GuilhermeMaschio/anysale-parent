@@ -3,6 +3,7 @@ package com.anysale.lead.adapters.in.rest.command;
 import com.anysale.lead.adapters.in.rest.dto.*;
 import com.anysale.lead.adapters.in.rest.maper.LeadMapper;
 import com.anysale.lead.aplication.LeadService; // seu service atual
+import com.anysale.lead.aplication.LeadWhatsAppService;
 import com.anysale.lead.aplication.service.LeadAiService;
 import com.anysale.lead.domain.model.Lead;
 import com.anysale.lead.internalauth.InternalTokenProtected;
@@ -21,10 +22,12 @@ public class LeadCommandController {
 
     private final LeadService service;
     private final LeadAiService leadAiService;
+    private final LeadWhatsAppService leadWhatsAppService;
 
-    public LeadCommandController(LeadService service, LeadAiService leadAiService) {
+    public LeadCommandController(LeadService service, LeadAiService leadAiService, LeadWhatsAppService leadWhatsAppService) {
         this.service = service;
         this.leadAiService = leadAiService;
+        this.leadWhatsAppService = leadWhatsAppService;
     }
 
     /**
@@ -61,7 +64,7 @@ public class LeadCommandController {
     public ResponseEntity<StageChangedResponseDto> changeStage(
             @PathVariable UUID id, @Valid @RequestBody StageRequestDto req) {
 
-        StageChangedResponseDto body = service.changeStageAndReturnDto(id, req.getStage());
+        StageChangedResponseDto body = service.changeStageAndReturnDto(id, req.getStage(), req.getChangedBy(), req.getReason(), req.getActualValue(), req.getLostReason());
 
         var self = ServletUriComponentsBuilder
                 .fromCurrentRequestUri()
@@ -75,6 +78,12 @@ public class LeadCommandController {
                 .location(self)          // aponta para o recurso completo
                 .eTag(etag)              // ajuda em cache/condicionais
                 .body(body);
+    }
+
+    @PatchMapping("/{id}/commercial")
+    public ResponseEntity<LeadResponseDto> updateCommercial(@PathVariable UUID id, @Valid @RequestBody CommercialUpdateRequestDto body) {
+        Lead saved = service.updateCommercial(id, body);
+        return ResponseEntity.ok().eTag("\"" + saved.getUpdatedAt().toEpochMilli() + "\"").body(LeadMapper.toResponse(saved));
     }
 
     @Idempotent(operation = "LEAD_SUGGESTIONS_PATCH", resourceIdParam = "id", ttlSeconds = 86400)
@@ -128,6 +137,14 @@ public class LeadCommandController {
         );
 
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/whatsapp/messages")
+    public ResponseEntity<SendLeadWhatsAppMessageResponse> sendWhatsAppMessage(
+            @PathVariable UUID id,
+            @Valid @RequestBody SendLeadWhatsAppMessageRequest body
+    ) {
+        return ResponseEntity.ok(leadWhatsAppService.send(id, body));
     }
 
     @PostMapping("/interactions/status")

@@ -2,6 +2,7 @@ package com.anysale.lead.domain.model;
 
 import jakarta.persistence.*;
 import java.time.Instant;
+import java.math.BigDecimal;
 import java.util.*;
 
 @Entity
@@ -21,6 +22,11 @@ public class Lead {
     private String desiredCategory;
 
     private String stage;
+    @Column(name = "assigned_to") private String assignedTo;
+    @Column(name = "estimated_value", precision = 14, scale = 2) private BigDecimal estimatedValue;
+    @Column(name = "actual_value", precision = 14, scale = 2) private BigDecimal actualValue;
+    @Column(name = "lost_reason", length = 500) private String lostReason;
+    @Column(name = "closed_at") private Instant closedAt;
 
     @Column(name = "last_message", length = 2000)
     private String lastMessage;
@@ -82,6 +88,11 @@ public class Lead {
     public void setDesiredCategory(String desiredCategory) { this.desiredCategory = desiredCategory; }
     public String getStage() { return stage; }
     public void setStage(String stage) { this.stage = stage; }
+    public String getAssignedTo() { return assignedTo; } public void setAssignedTo(String v) { assignedTo = v; }
+    public BigDecimal getEstimatedValue() { return estimatedValue; } public void setEstimatedValue(BigDecimal v) { estimatedValue = v; }
+    public BigDecimal getActualValue() { return actualValue; } public void setActualValue(BigDecimal v) { actualValue = v; }
+    public String getLostReason() { return lostReason; } public void setLostReason(String v) { lostReason = v; }
+    public Instant getClosedAt() { return closedAt; } public void setClosedAt(Instant v) { closedAt = v; }
     public String getLastMessage() { return lastMessage; }
     public void setLastMessage(String lastMessage) { this.lastMessage = lastMessage; }
     public Instant getLastInteractionAt() { return lastInteractionAt; }

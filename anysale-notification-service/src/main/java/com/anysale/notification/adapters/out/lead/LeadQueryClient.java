@@ -18,7 +18,7 @@ public class LeadQueryClient {
 
     public LeadContactSnapshot getLead(UUID leadId) {
         return leadServiceRestClient.get()
-                .uri("/v1/leads/{leadId}", leadId)
+                .uri("/v1/internal/leads/{leadId}", leadId)
                 .retrieve()
                 .body(LeadContactSnapshot.class);
     }
