@@ -9,7 +9,10 @@ import java.util.UUID;
 
 public interface InteractionJpaRepository extends JpaRepository<Interaction, UUID> {
 
-    Optional<Interaction> findByChannelAndExternalMessageId(String channel, String externalMessageId);
+    @Deprecated default Optional<Interaction> findByChannelAndExternalMessageId(String channel, String externalMessageId) { throw new UnsupportedOperationException("tenant_id is required"); }
+    @Deprecated default List<Interaction> findByLead_IdOrderByCreatedAtAsc(UUID leadId) { throw new UnsupportedOperationException("tenant_id is required"); }
 
-    List<Interaction> findByLead_IdOrderByCreatedAtAsc(UUID leadId);
+    Optional<Interaction> findByTenantIdAndChannelAndExternalMessageId(String tenantId, String channel, String externalMessageId);
+
+    List<Interaction> findByTenantIdAndLead_IdOrderByCreatedAtAsc(String tenantId, UUID leadId);
 }

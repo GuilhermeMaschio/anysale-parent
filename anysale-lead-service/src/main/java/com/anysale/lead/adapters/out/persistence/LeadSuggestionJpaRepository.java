@@ -9,5 +9,5 @@ import java.util.UUID;
 
 public interface LeadSuggestionJpaRepository extends JpaRepository<LeadSuggestion, UUID> {
 
-    List<LeadSuggestion> findByLead_Id(java.util.UUID leadId);
+    List<LeadSuggestion> findByTenantIdAndLead_Id(String tenantId, java.util.UUID leadId);
 }

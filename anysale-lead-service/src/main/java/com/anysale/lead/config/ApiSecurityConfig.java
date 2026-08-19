@@ -35,12 +35,9 @@ public class ApiSecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/v1/internal/**").permitAll()
-                        .requestMatchers(HttpMethod.PATCH, "/v1/leads/*/enrichment").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/v1/leads/*/ai-enrichment").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/v1/leads/*/interactions/outbound").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/v1/leads/interactions/status").permitAll()
                         .requestMatchers(HttpMethod.POST, "/v1/leads/*/whatsapp/messages")
                         .hasAnyRole("SALES_AGENT", "SALES_MANAGER", "ADMIN")
+                        .requestMatchers("/v1/ai/**").hasRole("ADMIN")
                         .requestMatchers("/v1/**").authenticated()
                         .anyRequest().denyAll()
                 )

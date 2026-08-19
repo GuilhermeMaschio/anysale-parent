@@ -7,6 +7,7 @@ import com.anysale.lead.aplication.ai.LeadAiAssistant;
 import com.anysale.lead.aplication.ai.LeadAiDraft;
 import com.anysale.lead.domain.model.Interaction;
 import com.anysale.lead.domain.model.Lead;
+import com.anysale.lead.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -28,13 +29,14 @@ public class LeadAiService {
     private final InteractionJpaRepository interactionRepository;
     private final LeadEventPublisher leadEventPublisher;
     private final LeadAiAssistant leadAiAssistant;
+    private final TenantContext tenantContext;
 
     @Transactional
     public Lead enrichLeadFromConversation(UUID leadId) {
-        Lead lead = leadRepository.findByIdWithTags(leadId)
+        Lead lead = leadRepository.findByIdWithTags(leadId, tenantContext.tenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lead not found: " + leadId));
 
-        List<Interaction> interactions = interactionRepository.findByLead_IdOrderByCreatedAtAsc(leadId);
+        List<Interaction> interactions = interactionRepository.findByTenantIdAndLead_IdOrderByCreatedAtAsc(tenantContext.tenantId(), leadId);
         LeadAiDraft draft = leadAiAssistant.analyzeConversation(lead, interactions);
         applyDraft(lead, draft);
 
