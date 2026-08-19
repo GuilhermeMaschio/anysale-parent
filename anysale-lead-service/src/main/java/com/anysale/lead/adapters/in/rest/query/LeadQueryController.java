@@ -10,6 +10,7 @@ import com.anysale.lead.internalauth.InternalTokenProtected;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -36,7 +37,13 @@ public class LeadQueryController {
                 .toList();
     }
 
+    @GetMapping("/{id}/stage-history")
+    public List<com.anysale.lead.adapters.in.rest.dto.LeadStageHistoryResponseDto> stageHistory(@PathVariable UUID id) {
+        return service.listStageHistory(id).stream().map(LeadMapper::toStageHistoryResponse).toList();
+    }
+
     @GetMapping
+    @Transactional(readOnly = true)
     public Page<LeadResponseDto> list(
             @RequestParam(required = false) String stage,
             @RequestParam(required = false) String q,
