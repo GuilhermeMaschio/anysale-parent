@@ -3,6 +3,7 @@ package com.anysale.lead.adapters.in.rest.command;
 import com.anysale.lead.adapters.in.rest.dto.*;
 import com.anysale.lead.adapters.in.rest.maper.LeadMapper;
 import com.anysale.lead.aplication.LeadService; // seu service atual
+import com.anysale.lead.aplication.LeadWhatsAppService;
 import com.anysale.lead.aplication.service.LeadAiService;
 import com.anysale.lead.domain.model.Lead;
 import com.anysale.lead.internalauth.InternalTokenProtected;
@@ -21,10 +22,12 @@ public class LeadCommandController {
 
     private final LeadService service;
     private final LeadAiService leadAiService;
+    private final LeadWhatsAppService leadWhatsAppService;
 
-    public LeadCommandController(LeadService service, LeadAiService leadAiService) {
+    public LeadCommandController(LeadService service, LeadAiService leadAiService, LeadWhatsAppService leadWhatsAppService) {
         this.service = service;
         this.leadAiService = leadAiService;
+        this.leadWhatsAppService = leadWhatsAppService;
     }
 
     /**
@@ -134,6 +137,14 @@ public class LeadCommandController {
         );
 
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/whatsapp/messages")
+    public ResponseEntity<SendLeadWhatsAppMessageResponse> sendWhatsAppMessage(
+            @PathVariable UUID id,
+            @Valid @RequestBody SendLeadWhatsAppMessageRequest body
+    ) {
+        return ResponseEntity.ok(leadWhatsAppService.send(id, body));
     }
 
     @PostMapping("/interactions/status")

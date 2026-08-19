@@ -47,12 +47,14 @@ public class LeadService {
                        LeadSuggestionJpaRepository suggestionRepo,
                        InteractionJpaRepository interactionRepo,
                        LeadEventPublisher events, LeadStageHistoryJpaRepository stageHistoryRepo, TenantContext tenantContext) {
+
         this.leadRepo = leadRepo;
         this.suggestionRepo = suggestionRepo;
         this.interactionRepo = interactionRepo;
         this.events = events;
         this.stageHistoryRepo = stageHistoryRepo;
         this.tenantContext = tenantContext;
+
     }
 
     @Transactional
@@ -147,6 +149,39 @@ public class LeadService {
     @Transactional(readOnly = true)
     public com.anysale.lead.adapters.in.rest.dto.SalesFunnelReportDto salesFunnelReport() {
         List<Lead> leads = leadRepo.findByTenantId(tenantContext.tenantId(), Pageable.unpaged()).getContent();
+        Map<String, Long> byStage = Arrays.stream(LeadStage.values()).collect(Collectors.toMap(Enum::name, ignored -> 0L, (a,b) -> a, LinkedHashMap::new));
+        leads.forEach(lead -> byStage.compute(LeadStage.from(lead.getStage()).name(), (key, value) -> value + 1));
+        long won = byStage.get(LeadStage.WON.name());
+        long lost = byStage.get(LeadStage.LOST.name());
+        BigDecimal pipeline = leads.stream().map(Lead::getEstimatedValue).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal revenue = leads.stream().filter(lead -> LeadStage.WON.name().equals(lead.getStage())).map(Lead::getActualValue).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal ticket = won == 0 ? BigDecimal.ZERO : revenue.divide(BigDecimal.valueOf(won), 2, RoundingMode.HALF_UP);
+        BigDecimal winRate = leads.isEmpty() ? BigDecimal.ZERO : BigDecimal.valueOf(won).multiply(BigDecimal.valueOf(100)).divide(BigDecimal.valueOf(leads.size()), 2, RoundingMode.HALF_UP);
+        Map<String, Long> losses = leads.stream().filter(lead -> LeadStage.LOST.name().equals(lead.getStage())).map(Lead::getLostReason).filter(Objects::nonNull).filter(value -> !value.isBlank()).collect(Collectors.groupingBy(value -> value, LinkedHashMap::new, Collectors.counting()));
+        return com.anysale.lead.adapters.in.rest.dto.SalesFunnelReportDto.builder().totalLeads(leads.size()).leadsByStage(byStage).wonLeads(won).lostLeads(lost).estimatedPipelineValue(pipeline).wonRevenue(revenue).averageTicket(ticket).winRatePercent(winRate).lossesByReason(losses).generatedAt(Instant.now()).build();
+    }
+
+    @Transactional
+    public Lead updateCommercial(UUID leadId, com.anysale.lead.adapters.in.rest.dto.CommercialUpdateRequestDto request) {
+        Lead lead = get(leadId);
+        if (request.getAssignedTo() != null) lead.setAssignedTo(trimToNull(request.getAssignedTo()));
+        if (request.getEstimatedValue() != null) lead.setEstimatedValue(request.getEstimatedValue());
+        if (request.getActualValue() != null) lead.setActualValue(request.getActualValue());
+        if (request.getLostReason() != null) lead.setLostReason(trimToNull(request.getLostReason()));
+        Lead saved = leadRepo.save(lead);
+        publishAfterCommitOrNow(() -> events.publishLeadUpdated(saved, "COMMERCIAL_DATA_UPDATED"));
+        return saved;
+    }
+
+    @Transactional(readOnly = true)
+    public List<LeadStageHistory> listStageHistory(UUID leadId) {
+        if (!leadRepo.existsById(leadId)) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Lead not found: " + leadId);
+        return stageHistoryRepo.findByLead_IdOrderByCreatedAtAsc(leadId);
+    }
+
+    @Transactional(readOnly = true)
+    public com.anysale.lead.adapters.in.rest.dto.SalesFunnelReportDto salesFunnelReport() {
+        List<Lead> leads = leadRepo.findAll();
         Map<String, Long> byStage = Arrays.stream(LeadStage.values()).collect(Collectors.toMap(Enum::name, ignored -> 0L, (a,b) -> a, LinkedHashMap::new));
         leads.forEach(lead -> byStage.compute(LeadStage.from(lead.getStage()).name(), (key, value) -> value + 1));
         long won = byStage.get(LeadStage.WON.name());

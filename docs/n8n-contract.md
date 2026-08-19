@@ -237,6 +237,16 @@ Required runtime settings:
 
 Protected with `X-Internal-Token` when `ANYSALE_INTERNAL_TOKEN` is configured.
 
+#### Console integration boundary
+
+This is a **server-to-server** endpoint. The browser-based AnySale Console must
+not call it directly and must never receive `X-Internal-Token`,
+`WHATSAPP_ACCESS_TOKEN`, or `WHATSAPP_PHONE_NUMBER_ID`. A Console BFF/API
+gateway authenticated for the operator must call this endpoint server-side and
+inject `X-Internal-Token`. No such BFF route is implemented in this repository
+today, so pointing `VITE_LEAD_SERVICE_URL` at notification-service will not
+activate the composer safely.
+
 Request body:
 
 ```json
@@ -264,6 +274,40 @@ Current behavior:
 - Uses the Meta endpoint `POST /{version}/{phone-number-id}/messages`.
 - If `leadId` is present, persists an `OUT` interaction in the lead service.
 - The returned `messageId` becomes the correlation key used later by Meta status webhooks.
+
+Validation and errors:
+- `400 Bad Request`: `to` or `message` is blank, or `leadId` is not a UUID.
+- `401 Unauthorized`: `ANYSALE_INTERNAL_TOKEN` is configured and the supplied
+  `X-Internal-Token` is absent or invalid.
+- `503 Service Unavailable`: WhatsApp outbound is disabled because
+  `WHATSAPP_PHONE_NUMBER_ID` or `WHATSAPP_ACCESS_TOKEN` is missing. The error
+  identifies the missing setting but never exposes its value.
+- Meta/API failures are propagated as their HTTP status; no `OUT` interaction
+  is recorded unless Meta first accepts the send.
+
+### Console-safe WhatsApp send
+
+The Console calls the lead-service, never notification-service directly:
+
+`POST /v1/leads/{leadId}/whatsapp/messages`
+
+Request body:
+
+```json
+{ "message": "Oi, posso te ajudar com a cadeira ergonomica." }
+```
+
+The lead-service loads and normalizes the lead phone, then calls the internal
+notification endpoint with `X-Internal-Token`. The response is the same `200`
+payload as the manual notification endpoint. It returns `400` if the message
+is blank/over 2000 characters or the lead has no phone, `404` if the lead does
+not exist, and propagates notification availability/failure status without
+exposing internal or Meta secrets.
+
+When `ANYSALE_SECURITY_ENABLED=true`, this endpoint requires a Keycloak JWT
+with `SALES_AGENT`, `SALES_MANAGER`, or `ADMIN` in either `realm_access.roles`
+or `resource_access.<ANYSALE_SECURITY_KEYCLOAK_CLIENT_ID>.roles`. All other
+`/v1/**` endpoints require an authenticated JWT. Health/info remain public.
 
 ### Send Suggested WhatsApp Message
 

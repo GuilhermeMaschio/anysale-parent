@@ -34,6 +34,11 @@ SPRING_FLYWAY_ENABLED=true
 SPRING_KAFKA_BOOTSTRAP_SERVERS=<kafka-host>:9092
 SPRING_KAFKA_CONSUMER_GROUP_ID=lead-service
 SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET=earliest
+ANYSALE_INTERNAL_TOKEN=<long-random-shared-secret>
+NOTIFICATION_SERVICE_BASE_URL=https://<notification-service-host>
+ANYSALE_SECURITY_ENABLED=true
+KEYCLOAK_ISSUER=https://<keycloak-host>/realms/anysale-realm
+ANYSALE_SECURITY_KEYCLOAK_CLIENT_ID=anysale-console
 ```
 
 ### `anysale-ingestion-gateway`
@@ -61,6 +66,7 @@ WHATSAPP_GRAPH_API_BASE_URL=https://graph.facebook.com
 WHATSAPP_GRAPH_API_VERSION=v20.0
 WHATSAPP_PHONE_NUMBER_ID=<meta-phone-number-id>
 WHATSAPP_ACCESS_TOKEN=<rotated-access-token>
+ANYSALE_INTERNAL_TOKEN=<long-random-shared-secret>
 ```
 
 ## 3. Meta Configuration

@@ -1,6 +1,8 @@
 package com.anysale.lead.adapters.in.rest.command;
 
 import com.anysale.lead.aplication.LeadService;
+import com.anysale.lead.aplication.LeadWhatsAppService;
+import com.anysale.lead.adapters.in.rest.dto.SendLeadWhatsAppMessageResponse;
 import com.anysale.lead.aplication.service.LeadAiService;
 import com.anysale.lead.domain.model.Interaction;
 import com.anysale.lead.domain.model.Lead;
@@ -8,6 +10,8 @@ import com.anysale.lead.idempotency.IdempotencyService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import com.anysale.lead.config.LocalSecurityConfig;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -26,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = LeadCommandController.class, properties = "internal.auth.token=test-token")
+@Import(LocalSecurityConfig.class)
 class LeadCommandControllerTest {
     private static final String INTERNAL_TOKEN = "test-token";
 
@@ -37,6 +42,9 @@ class LeadCommandControllerTest {
 
     @MockBean
     private LeadAiService leadAiService;
+
+    @MockBean
+    private LeadWhatsAppService leadWhatsAppService;
 
     @MockBean
     private IdempotencyService idempotencyService;
@@ -111,6 +119,28 @@ class LeadCommandControllerTest {
                 .andExpect(jsonPath("$.externalMessageId").value("wamid.outbound.001"));
 
         verify(leadService).recordOutboundInteraction(eq(leadId), any());
+    }
+
+    @Test
+    void sendsWhatsAppMessageUsingTheLeadDestination() throws Exception {
+        UUID leadId = UUID.randomUUID();
+        when(leadWhatsAppService.send(eq(leadId), any())).thenReturn(
+                new SendLeadWhatsAppMessageResponse(
+                        leadId, "5541999999999", "5541999999999", "wamid.outbound.001", "SENT"
+                )
+        );
+
+        mockMvc.perform(post("/v1/leads/{id}/whatsapp/messages", leadId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "message": "Oi, posso te ajudar?" }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.leadId").value(leadId.toString()))
+                .andExpect(jsonPath("$.messageId").value("wamid.outbound.001"))
+                .andExpect(jsonPath("$.status").value("SENT"));
+
+        verify(leadWhatsAppService).send(eq(leadId), any());
     }
 
     @Test
