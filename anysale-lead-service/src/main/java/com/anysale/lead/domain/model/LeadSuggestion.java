@@ -12,7 +12,6 @@ public class LeadSuggestion {
     @Id
     @Column(columnDefinition = "uuid")
     private UUID id;
-    @Column(name = "tenant_id", nullable = false, length = 64) private String tenantId;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "lead_id")
@@ -32,7 +31,6 @@ public class LeadSuggestion {
     }
 
     public UUID getId() { return id; }
-    public String getTenantId() { return tenantId; } public void setTenantId(String tenantId) { this.tenantId = tenantId; }
     public void setId(UUID id) { this.id = id; }
     public Lead getLead() { return lead; }
     public void setLead(Lead lead) { this.lead = lead; }

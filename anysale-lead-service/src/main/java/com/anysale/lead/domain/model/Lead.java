@@ -12,8 +12,6 @@ public class Lead {
     @Id
     @Column(columnDefinition = "uuid")
     private UUID id;
-    @Column(name = "tenant_id", nullable = false, length = 64)
-    private String tenantId;
 
     private String name;
     private String email;
@@ -77,8 +75,6 @@ public class Lead {
     }
 
     public UUID getId() { return id; }
-    public String getTenantId() { return tenantId; }
-    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
     public void setId(UUID id) { this.id = id; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }

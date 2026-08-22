@@ -10,6 +10,6 @@ public class ConsoleCorsConfig implements WebMvcConfigurer {
     private final String consoleOrigin;
     public ConsoleCorsConfig(@Value("${anysale.console.origin:http://localhost:5173}") String consoleOrigin) { this.consoleOrigin = consoleOrigin; }
     @Override public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/v1/**").allowedOrigins(consoleOrigin).allowedMethods("GET", "POST", "PATCH", "OPTIONS").allowedHeaders("Content-Type", "X-Internal-Token", "Idempotency-Key");
+        registry.addMapping("/v1/**").allowedOrigins(consoleOrigin).allowedMethods("GET", "POST", "PUT", "PATCH", "OPTIONS").allowedHeaders("Authorization", "Content-Type", "X-Internal-Token", "Idempotency-Key");
     }
 }

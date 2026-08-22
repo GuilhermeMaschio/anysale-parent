@@ -29,13 +29,16 @@ public class AiSettingsService {
     private String defaultModel;
     @Value("${anysale.ai.openai.allowed-models:}")
     private String allowedModelsValue;
+    @Value("${anysale.ai.openai.api-key:}")
+    private String apiKey;
 
     @Transactional(readOnly = true)
     public AiPolicy policy() {
         AiSettings settings = settings();
         UsageSummary usage = currentUsage();
         String model = hasText(settings.getModel()) ? settings.getModel() : defaultModel;
-        return new AiPolicy(providerEnabled, providerEnabled && settings.isEnabled(), model, settings.getMaxOutputTokens(),
+        boolean providerAvailable = providerEnabled && hasText(apiKey);
+        return new AiPolicy(providerAvailable, providerAvailable && settings.isEnabled(), model, settings.getMaxOutputTokens(),
                 settings.getMonthlyRequestLimit(), settings.getMonthlyTokenLimit(), usage.requests(), usage.totalTokens());
     }
 

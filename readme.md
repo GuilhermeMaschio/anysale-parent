@@ -6,6 +6,8 @@ O MVP atual recebe conversas do WhatsApp, consolida o histórico de cada contato
 
 > Arquitetura hexagonal · Java 17 · Spring Boot · Kafka · PostgreSQL · MongoDB · n8n · WhatsApp Cloud API
 
+> Para preparar uma máquina de desenvolvimento do zero, consulte o [guia de onboarding](docs/onboarding.md).
+
 ## Objetivo do produto
 
 Reduzir o tempo entre uma mensagem de interesse e uma resposta comercial relevante. Em vez de tratar cada conversa isoladamente, o AnySale mantém um lead com contexto, intenção, pontuação, histórico e recomendações de produto.
@@ -28,7 +30,7 @@ O fluxo prioriza três resultados:
 | Acompanhamento de envio | Atualizações de status da Meta persistidas na interação correspondente. |
 | Catálogo e recomendações | Catálogo no MongoDB e sugestões de produtos assíncronas por Kafka. |
 | Segurança interna | Endpoints de automação aceitam `X-Internal-Token` quando `ANYSALE_INTERNAL_TOKEN` está configurado. |
-| Operação local | Docker Compose com PostgreSQL, MongoDB, Kafka e painel do n8n. |
+| Operação local | Docker Compose com PostgreSQL, MongoDB, Kafka, n8n e Keycloak. |
 
 ## Visão da arquitetura
 

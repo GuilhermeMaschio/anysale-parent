@@ -11,7 +11,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-@Component
+@Component("ruleBasedLeadAiAssistant")
 public class RuleBasedLeadAiAssistant implements LeadAiAssistant {
 
     @Override

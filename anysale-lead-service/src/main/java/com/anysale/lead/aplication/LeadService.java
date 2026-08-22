@@ -17,7 +17,6 @@ import com.anysale.lead.domain.model.Lead;
 import com.anysale.lead.domain.model.LeadSuggestion;
 import com.anysale.lead.domain.model.LeadStage;
 import com.anysale.lead.domain.model.LeadStageHistory;
-import com.anysale.lead.tenant.TenantContext;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -41,27 +40,22 @@ public class LeadService {
     private final InteractionJpaRepository interactionRepo;
     private final LeadEventPublisher events;
     private final LeadStageHistoryJpaRepository stageHistoryRepo;
-    private final TenantContext tenantContext;
 
     public LeadService(LeadJpaRepository leadRepo,
                        LeadSuggestionJpaRepository suggestionRepo,
                        InteractionJpaRepository interactionRepo,
-                       LeadEventPublisher events, LeadStageHistoryJpaRepository stageHistoryRepo, TenantContext tenantContext) {
-
+                       LeadEventPublisher events, LeadStageHistoryJpaRepository stageHistoryRepo) {
         this.leadRepo = leadRepo;
         this.suggestionRepo = suggestionRepo;
         this.interactionRepo = interactionRepo;
         this.events = events;
         this.stageHistoryRepo = stageHistoryRepo;
-        this.tenantContext = tenantContext;
-
     }
 
     @Transactional
     public Lead createLead(String name, String email, String phone,
                            String source, String desiredCategory, List<String> desiredTags) {
         Lead lead = new Lead();
-        lead.setTenantId(tenantContext.tenantId());
         lead.setName(name);
         lead.setEmail(email);
         lead.setPhone(normalizePhone(phone));
@@ -84,7 +78,7 @@ public class LeadService {
 
     @Transactional
     public StageChangedResponseDto changeStageAndReturnDto(UUID id, String stage, String changedBy, String reason, java.math.BigDecimal actualValue, String lostReason) {
-        Lead lead = leadRepo.findByIdWithTags(id, tenantContext.tenantId()).orElseThrow();
+        Lead lead = leadRepo.findByIdWithTags(id).orElseThrow();
         String old = lead.getStage();
         LeadStage current = LeadStage.from(old);
         LeadStage target = LeadStage.from(stage);
@@ -108,13 +102,12 @@ public class LeadService {
 
     @Transactional(readOnly = true)
     public Lead get(UUID id) {
-        return leadRepo.findByIdWithTags(id, tenantContext.tenantId())
+        return leadRepo.findByIdWithTags(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lead not found: " + id));
     }
 
     private void recordStageHistory(Lead lead, String from, String to, String changedBy, String reason) {
         LeadStageHistory history = new LeadStageHistory();
-        history.setTenantId(lead.getTenantId());
         history.setLead(lead); history.setFromStage(from); history.setToStage(to);
         history.setChangedBy(trimToNull(changedBy)); history.setReason(trimToNull(reason));
         stageHistoryRepo.save(history);
@@ -122,43 +115,10 @@ public class LeadService {
 
     @Transactional(readOnly = true)
     public List<Interaction> listInteractions(UUID leadId) {
-        if (leadRepo.findByIdWithTags(leadId, tenantContext.tenantId()).isEmpty()) {
+        if (!leadRepo.existsById(leadId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Lead not found: " + leadId);
         }
-        return interactionRepo.findByTenantIdAndLead_IdOrderByCreatedAtAsc(tenantContext.tenantId(), leadId);
-    }
-
-    @Transactional
-    public Lead updateCommercial(UUID leadId, com.anysale.lead.adapters.in.rest.dto.CommercialUpdateRequestDto request) {
-        Lead lead = get(leadId);
-        if (request.getAssignedTo() != null) lead.setAssignedTo(trimToNull(request.getAssignedTo()));
-        if (request.getEstimatedValue() != null) lead.setEstimatedValue(request.getEstimatedValue());
-        if (request.getActualValue() != null) lead.setActualValue(request.getActualValue());
-        if (request.getLostReason() != null) lead.setLostReason(trimToNull(request.getLostReason()));
-        Lead saved = leadRepo.save(lead);
-        publishAfterCommitOrNow(() -> events.publishLeadUpdated(saved, "COMMERCIAL_DATA_UPDATED"));
-        return saved;
-    }
-
-    @Transactional(readOnly = true)
-    public List<LeadStageHistory> listStageHistory(UUID leadId) {
-        if (leadRepo.findByIdWithTags(leadId, tenantContext.tenantId()).isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Lead not found: " + leadId);
-        return stageHistoryRepo.findByTenantIdAndLead_IdOrderByCreatedAtAsc(tenantContext.tenantId(), leadId);
-    }
-
-    @Transactional(readOnly = true)
-    public com.anysale.lead.adapters.in.rest.dto.SalesFunnelReportDto salesFunnelReport() {
-        List<Lead> leads = leadRepo.findByTenantId(tenantContext.tenantId(), Pageable.unpaged()).getContent();
-        Map<String, Long> byStage = Arrays.stream(LeadStage.values()).collect(Collectors.toMap(Enum::name, ignored -> 0L, (a,b) -> a, LinkedHashMap::new));
-        leads.forEach(lead -> byStage.compute(LeadStage.from(lead.getStage()).name(), (key, value) -> value + 1));
-        long won = byStage.get(LeadStage.WON.name());
-        long lost = byStage.get(LeadStage.LOST.name());
-        BigDecimal pipeline = leads.stream().map(Lead::getEstimatedValue).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal revenue = leads.stream().filter(lead -> LeadStage.WON.name().equals(lead.getStage())).map(Lead::getActualValue).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal ticket = won == 0 ? BigDecimal.ZERO : revenue.divide(BigDecimal.valueOf(won), 2, RoundingMode.HALF_UP);
-        BigDecimal winRate = leads.isEmpty() ? BigDecimal.ZERO : BigDecimal.valueOf(won).multiply(BigDecimal.valueOf(100)).divide(BigDecimal.valueOf(leads.size()), 2, RoundingMode.HALF_UP);
-        Map<String, Long> losses = leads.stream().filter(lead -> LeadStage.LOST.name().equals(lead.getStage())).map(Lead::getLostReason).filter(Objects::nonNull).filter(value -> !value.isBlank()).collect(Collectors.groupingBy(value -> value, LinkedHashMap::new, Collectors.counting()));
-        return com.anysale.lead.adapters.in.rest.dto.SalesFunnelReportDto.builder().totalLeads(leads.size()).leadsByStage(byStage).wonLeads(won).lostLeads(lost).estimatedPipelineValue(pipeline).wonRevenue(revenue).averageTicket(ticket).winRatePercent(winRate).lossesByReason(losses).generatedAt(Instant.now()).build();
+        return interactionRepo.findByLead_IdOrderByCreatedAtAsc(leadId);
     }
 
     @Transactional
@@ -196,21 +156,20 @@ public class LeadService {
 
     @Transactional
     public Interaction recordOutboundInteraction(UUID leadId, com.anysale.lead.adapters.in.rest.dto.OutboundInteractionRequest request) {
-        Lead lead = leadRepo.findByIdWithTags(leadId, tenantContext.tenantId())
+        Lead lead = leadRepo.findByIdWithTags(leadId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lead not found: " + leadId));
 
         String normalizedChannel = normalizeChannel(request.channel());
         String externalMessageId = trimToNull(request.externalMessageId());
 
         if (externalMessageId != null) {
-            Optional<Interaction> existing = interactionRepo.findByTenantIdAndChannelAndExternalMessageId(tenantContext.tenantId(), normalizedChannel, externalMessageId);
+            Optional<Interaction> existing = interactionRepo.findByChannelAndExternalMessageId(normalizedChannel, externalMessageId);
             if (existing.isPresent()) {
                 return existing.get();
             }
         }
 
         Interaction interaction = new Interaction();
-        interaction.setTenantId(lead.getTenantId());
         interaction.setLead(lead);
         interaction.setMessage(request.message().trim());
         interaction.setChannel(normalizedChannel);
@@ -237,7 +196,7 @@ public class LeadService {
             return;
         }
 
-        Optional<Interaction> existing = interactionRepo.findByTenantIdAndChannelAndExternalMessageId(tenantContext.tenantId(), normalizedChannel, externalMessageId);
+        Optional<Interaction> existing = interactionRepo.findByChannelAndExternalMessageId(normalizedChannel, externalMessageId);
         if (existing.isEmpty()) {
             return;
         }
@@ -273,8 +232,8 @@ public class LeadService {
         String stageOrNull = normalize(stage);
         String qOrNull = normalize(q);
         Pageable pageable = PageRequest.of(page, size, sort);
-        if (stageOrNull == null && qOrNull == null) return leadRepo.findByTenantId(tenantContext.tenantId(), pageable);
-        return leadRepo.search(tenantContext.tenantId(), stageOrNull, qOrNull, pageable);
+        if (stageOrNull == null && qOrNull == null) return leadRepo.findAll(pageable);
+        return leadRepo.search(stageOrNull, qOrNull, pageable);
     }
 
     private String normalize(String s) {
@@ -302,7 +261,7 @@ public class LeadService {
 
     @Transactional
     public Lead applyEnrichment(UUID leadId, LeadEnrichmentRequestDto request) {
-        Lead lead = leadRepo.findByIdWithTags(leadId, tenantContext.tenantId())
+        Lead lead = leadRepo.findByIdWithTags(leadId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lead not found: " + leadId));
 
         if (request.getSummary() != null) {
@@ -332,12 +291,12 @@ public class LeadService {
 
     @Transactional
     public BulkApplyResponseDto attachSuggestionsBulk(UUID leadId, List<LeadSuggestion> suggestions) {
-        Lead lead = leadRepo.findByIdWithTags(leadId, tenantContext.tenantId())
+        Lead lead = leadRepo.findById(leadId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lead not found: " + leadId));
 
         List<LeadSuggestion> incoming = (suggestions == null) ? List.of() : suggestions;
 
-        Set<String> existingProdIds = suggestionRepo.findByTenantIdAndLead_Id(tenantContext.tenantId(), leadId).stream()
+        Set<String> existingProdIds = suggestionRepo.findByLead_Id(leadId).stream()
                 .map(LeadSuggestion::getProductId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
@@ -375,7 +334,6 @@ public class LeadService {
             }
 
             s.setLead(lead);
-            s.setTenantId(lead.getTenantId());
             toPersist.add(s);
         }
 

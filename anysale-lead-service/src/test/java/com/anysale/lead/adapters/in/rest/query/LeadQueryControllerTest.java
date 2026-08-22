@@ -4,6 +4,8 @@ import com.anysale.lead.aplication.LeadService;
 import com.anysale.lead.domain.model.Interaction;
 import com.anysale.lead.domain.model.Lead;
 import com.anysale.lead.idempotency.IdempotencyService;
+import com.anysale.lead.config.LocalSecurityConfig;
+import org.springframework.context.annotation.Import;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -20,6 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = LeadQueryController.class, properties = "internal.auth.token=test-token")
+@Import(LocalSecurityConfig.class)
 class LeadQueryControllerTest {
 
     private static final String INTERNAL_TOKEN = "test-token";
