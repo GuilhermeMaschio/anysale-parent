@@ -9,6 +9,7 @@ import com.anysale.lead.adapters.out.persistence.LeadJpaRepository;
 import com.anysale.lead.adapters.out.persistence.LeadSuggestionJpaRepository;
 import com.anysale.lead.domain.model.Interaction;
 import com.anysale.lead.domain.model.Lead;
+import com.anysale.lead.tenant.TenantContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -42,6 +43,9 @@ class LeadServiceTest {
 
     @Mock
     private LeadEventPublisher events;
+
+    @Mock
+    private TenantContext tenantContext;
 
     @InjectMocks
     private LeadService service;
@@ -230,5 +234,23 @@ class LeadServiceTest {
         assertThat(interaction.getDeliveryStatus()).isEqualTo("READ");
         verify(interactionRepo, never()).save(any(Interaction.class));
         verify(events, never()).publishLeadUpdated(any(Lead.class), any());
+    }
+
+    @Test
+    void recordTestInteractionCopiesTheTenantFromTheLead() {
+        UUID leadId = UUID.randomUUID();
+        Lead lead = new Lead();
+        lead.setId(leadId);
+        lead.setTenantId("anysale");
+
+        when(leadRepo.findByIdWithTags(leadId)).thenReturn(Optional.of(lead));
+        when(interactionRepo.save(any(Interaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(leadRepo.save(any(Lead.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Interaction saved = service.recordTestInteraction(leadId, "Mensagem de teste", "IN");
+
+        assertThat(saved.getTenantId()).isEqualTo("anysale");
+        assertThat(saved.getMessage()).isEqualTo("Mensagem de teste");
+        assertThat(saved.getDirection()).isEqualTo("INBOUND");
     }
 }

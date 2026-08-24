@@ -24,6 +24,9 @@ public class Interaction {
     @JoinColumn(name = "lead_id", nullable = false)
     private Lead lead;
 
+    @Column(name = "tenant_id", nullable = false, updatable = false, length = 64)
+    private String tenantId;
+
     @Column(nullable = false, length = 2000)
     private String message;
 
@@ -71,6 +74,8 @@ public class Interaction {
     public void setId(UUID id) { this.id = id; }
     public Lead getLead() { return lead; }
     public void setLead(Lead lead) { this.lead = lead; }
+    public String getTenantId() { return tenantId; }
+    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }
     public String getChannel() { return channel; }

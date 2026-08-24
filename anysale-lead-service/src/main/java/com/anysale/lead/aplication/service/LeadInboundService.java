@@ -9,6 +9,7 @@ import com.anysale.lead.adapters.out.persistence.LeadJpaRepository;
 import com.anysale.lead.aplication.usecase.HandleIncomingMessageUseCase;
 import com.anysale.lead.domain.model.Interaction;
 import com.anysale.lead.domain.model.Lead;
+import com.anysale.lead.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,7 @@ public class LeadInboundService implements HandleIncomingMessageUseCase {
     private final InteractionJpaRepository interactionRepository;
     private final LeadEventPublisher leadEventPublisher;
     private final LeadAiService leadAiService;
+    private final TenantContext tenantContext;
 
     @Override
     @Transactional
@@ -48,6 +50,7 @@ public class LeadInboundService implements HandleIncomingMessageUseCase {
 
         Interaction interaction = new Interaction();
         interaction.setLead(leadResolution.lead());
+        interaction.setTenantId(leadResolution.lead().getTenantId());
         interaction.setMessage(request.message().trim());
         interaction.setChannel(normalizedChannel);
         interaction.setDirection(INBOUND_DIRECTION);
@@ -84,6 +87,7 @@ public class LeadInboundService implements HandleIncomingMessageUseCase {
             lead.setPhone(normalizedPhone);
             lead.setName(fallbackLeadName);
             lead.setSource(normalizedChannel);
+            lead.setTenantId(tenantContext.tenantId());
             created = true;
         } else {
             lead.setPhone(normalizedPhone);

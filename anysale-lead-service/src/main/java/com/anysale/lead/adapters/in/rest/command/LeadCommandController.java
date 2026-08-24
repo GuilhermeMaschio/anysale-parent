@@ -5,11 +5,13 @@ import com.anysale.lead.adapters.in.rest.maper.LeadMapper;
 import com.anysale.lead.aplication.LeadService; // seu service atual
 import com.anysale.lead.aplication.LeadWhatsAppService;
 import com.anysale.lead.aplication.service.LeadAiService;
+import com.anysale.lead.aplication.ai.OpenAiLeadAiAssistant;
 import com.anysale.lead.domain.model.Lead;
 import com.anysale.lead.internalauth.InternalTokenProtected;
 import com.anysale.lead.idempotency.Idempotent;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -23,11 +25,13 @@ public class LeadCommandController {
     private final LeadService service;
     private final LeadAiService leadAiService;
     private final LeadWhatsAppService leadWhatsAppService;
+    private final OpenAiLeadAiAssistant openAiLeadAiAssistant;
 
-    public LeadCommandController(LeadService service, LeadAiService leadAiService, LeadWhatsAppService leadWhatsAppService) {
+    public LeadCommandController(LeadService service, LeadAiService leadAiService, LeadWhatsAppService leadWhatsAppService, OpenAiLeadAiAssistant openAiLeadAiAssistant) {
         this.service = service;
         this.leadAiService = leadAiService;
         this.leadWhatsAppService = leadWhatsAppService;
+        this.openAiLeadAiAssistant = openAiLeadAiAssistant;
     }
 
     /**
@@ -115,10 +119,11 @@ public class LeadCommandController {
     }
 
     @PostMapping("/{id}/ai-enrichment")
-    @InternalTokenProtected
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<LeadResponseDto> regenerateAiEnrichment(@PathVariable UUID id) {
         Lead saved = leadAiService.enrichLeadFromConversation(id);
         LeadResponseDto response = LeadMapper.toResponse(saved);
+        response.setAiProviderStatus(openAiLeadAiAssistant.lastAttemptStatus());
 
         return ResponseEntity.ok()
                 .location(URI.create("/v1/leads/" + id))

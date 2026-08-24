@@ -18,6 +18,9 @@ public class Lead {
     private String phone;
     private String source;
 
+    @Column(name = "tenant_id", nullable = false, updatable = false, length = 64)
+    private String tenantId;
+
     @Column(name = "desired_category")
     private String desiredCategory;
 
@@ -84,6 +87,8 @@ public class Lead {
     public void setPhone(String phone) { this.phone = phone; }
     public String getSource() { return source; }
     public void setSource(String source) { this.source = source; }
+    public String getTenantId() { return tenantId; }
+    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
     public String getDesiredCategory() { return desiredCategory; }
     public void setDesiredCategory(String desiredCategory) { this.desiredCategory = desiredCategory; }
     public String getStage() { return stage; }

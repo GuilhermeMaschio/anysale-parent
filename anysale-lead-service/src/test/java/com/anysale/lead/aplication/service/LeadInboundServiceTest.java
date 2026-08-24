@@ -7,6 +7,7 @@ import com.anysale.lead.adapters.out.persistence.InteractionJpaRepository;
 import com.anysale.lead.adapters.out.persistence.LeadJpaRepository;
 import com.anysale.lead.domain.model.Interaction;
 import com.anysale.lead.domain.model.Lead;
+import com.anysale.lead.tenant.TenantContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -41,6 +42,9 @@ class LeadInboundServiceTest {
     @Mock
     private LeadAiService leadAiService;
 
+    @Mock
+    private TenantContext tenantContext;
+
     @InjectMocks
     private LeadInboundService service;
 
@@ -57,6 +61,7 @@ class LeadInboundServiceTest {
         when(interactionRepository.findByChannelAndExternalMessageId("WHATSAPP", "msg-1"))
                 .thenReturn(Optional.empty());
         when(leadRepository.findAllByNormalizedPhone("5541999999999")).thenReturn(List.of());
+        when(tenantContext.tenantId()).thenReturn("anysale");
         when(leadRepository.save(any(Lead.class))).thenAnswer(invocation -> {
             Lead lead = invocation.getArgument(0);
             if (lead.getId() == null) {

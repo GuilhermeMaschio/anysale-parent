@@ -4,6 +4,7 @@ import com.anysale.lead.aplication.LeadService;
 import com.anysale.lead.aplication.LeadWhatsAppService;
 import com.anysale.lead.adapters.in.rest.dto.SendLeadWhatsAppMessageResponse;
 import com.anysale.lead.aplication.service.LeadAiService;
+import com.anysale.lead.aplication.ai.OpenAiLeadAiAssistant;
 import com.anysale.lead.domain.model.Interaction;
 import com.anysale.lead.domain.model.Lead;
 import com.anysale.lead.idempotency.IdempotencyService;
@@ -45,6 +46,9 @@ class LeadCommandControllerTest {
 
     @MockBean
     private LeadWhatsAppService leadWhatsAppService;
+
+    @MockBean
+    private OpenAiLeadAiAssistant openAiLeadAiAssistant;
 
     @MockBean
     private IdempotencyService idempotencyService;
@@ -176,13 +180,15 @@ class LeadCommandControllerTest {
         lead.setUpdatedAt(Instant.parse("2026-05-24T22:00:00Z"));
 
         when(leadAiService.enrichLeadFromConversation(leadId)).thenReturn(lead);
+        when(openAiLeadAiAssistant.lastAttemptStatus()).thenReturn("OPENAI");
 
         mockMvc.perform(post("/v1/leads/{id}/ai-enrichment", leadId)
                         .header("X-Internal-Token", INTERNAL_TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.summary").value("Resumo de IA"))
                 .andExpect(jsonPath("$.intent").value("BUYING"))
-                .andExpect(jsonPath("$.suggestedReply").value("Oi! Posso te mandar algumas opcoes."));
+                .andExpect(jsonPath("$.suggestedReply").value("Oi! Posso te mandar algumas opcoes."))
+                .andExpect(jsonPath("$.aiProviderStatus").value("OPENAI"));
 
         verify(leadAiService).enrichLeadFromConversation(leadId);
     }

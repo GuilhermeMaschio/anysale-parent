@@ -17,6 +17,7 @@ import com.anysale.lead.domain.model.Lead;
 import com.anysale.lead.domain.model.LeadSuggestion;
 import com.anysale.lead.domain.model.LeadStage;
 import com.anysale.lead.domain.model.LeadStageHistory;
+import com.anysale.lead.tenant.TenantContext;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -40,16 +41,19 @@ public class LeadService {
     private final InteractionJpaRepository interactionRepo;
     private final LeadEventPublisher events;
     private final LeadStageHistoryJpaRepository stageHistoryRepo;
+    private final TenantContext tenantContext;
 
     public LeadService(LeadJpaRepository leadRepo,
                        LeadSuggestionJpaRepository suggestionRepo,
                        InteractionJpaRepository interactionRepo,
-                       LeadEventPublisher events, LeadStageHistoryJpaRepository stageHistoryRepo) {
+                       LeadEventPublisher events, LeadStageHistoryJpaRepository stageHistoryRepo,
+                       TenantContext tenantContext) {
         this.leadRepo = leadRepo;
         this.suggestionRepo = suggestionRepo;
         this.interactionRepo = interactionRepo;
         this.events = events;
         this.stageHistoryRepo = stageHistoryRepo;
+        this.tenantContext = tenantContext;
     }
 
     @Transactional
@@ -60,6 +64,7 @@ public class LeadService {
         lead.setEmail(email);
         lead.setPhone(normalizePhone(phone));
         lead.setSource(source);
+        lead.setTenantId(tenantContext.tenantId());
         lead.setDesiredCategory(desiredCategory);
         lead.setDesiredTags(desiredTags != null ? new ArrayList<>(desiredTags) : new ArrayList<>());
         Lead saved = leadRepo.saveAndFlush(lead); // flush já aqui
@@ -108,7 +113,7 @@ public class LeadService {
 
     private void recordStageHistory(Lead lead, String from, String to, String changedBy, String reason) {
         LeadStageHistory history = new LeadStageHistory();
-        history.setLead(lead); history.setFromStage(from); history.setToStage(to);
+        history.setLead(lead); history.setTenantId(lead.getTenantId()); history.setFromStage(from); history.setToStage(to);
         history.setChangedBy(trimToNull(changedBy)); history.setReason(trimToNull(reason));
         stageHistoryRepo.save(history);
     }
@@ -171,6 +176,7 @@ public class LeadService {
 
         Interaction interaction = new Interaction();
         interaction.setLead(lead);
+        interaction.setTenantId(lead.getTenantId());
         interaction.setMessage(request.message().trim());
         interaction.setChannel(normalizedChannel);
         interaction.setDirection("OUT");
@@ -183,6 +189,28 @@ public class LeadService {
         leadRepo.save(lead);
 
         publishAfterCommitOrNow(() -> events.publishLeadUpdated(lead, "OUTBOUND_MESSAGE_SENT"));
+        return saved;
+    }
+
+    /**
+     * Supports local conversation fixtures only; the controller exposing it is profile-scoped.
+     */
+    @Transactional
+    public Interaction recordTestInteraction(UUID leadId, String message, String direction) {
+        Lead lead = leadRepo.findByIdWithTags(leadId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lead not found: " + leadId));
+
+        Interaction interaction = new Interaction();
+        interaction.setLead(lead);
+        interaction.setTenantId(lead.getTenantId());
+        interaction.setMessage(message.trim());
+        interaction.setChannel("CONSOLE_TEST");
+        interaction.setDirection("OUT".equals(direction) ? "OUTBOUND" : "INBOUND");
+
+        Interaction saved = interactionRepo.save(interaction);
+        lead.setLastMessage(message.trim());
+        lead.setLastInteractionAt(Instant.now());
+        leadRepo.save(lead);
         return saved;
     }
 
@@ -334,6 +362,7 @@ public class LeadService {
             }
 
             s.setLead(lead);
+            s.setTenantId(lead.getTenantId());
             toPersist.add(s);
         }
 

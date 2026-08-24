@@ -10,6 +10,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.client.ResourceAccessException;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -33,6 +35,7 @@ public class OpenAiLeadAiAssistant {
     private final ObjectMapper objectMapper;
     private final AiSettingsService aiSettingsService;
     private final String apiKey;
+    private volatile String lastAttemptStatus = "NOT_ATTEMPTED";
 
     public OpenAiLeadAiAssistant(
             RestClient.Builder restClientBuilder,
@@ -50,6 +53,7 @@ public class OpenAiLeadAiAssistant {
     public Optional<LeadAiDraft> analyzeConversation(Lead lead, List<Interaction> interactions) {
         AiPolicy policy = aiSettingsService.policy();
         if (!policy.enabled() || isBlank(apiKey) || isBlank(policy.model()) || !policy.withinBudget()) {
+            lastAttemptStatus = "NOT_READY";
             log.debug("OpenAI enrichment is not available for this request; using rules instead");
             return Optional.empty();
         }
@@ -65,11 +69,28 @@ public class OpenAiLeadAiAssistant {
 
             if (response == null) return Optional.empty();
             recordUsage(response, policy.model());
-            return parseDraft(response);
+            Optional<LeadAiDraft> draft = parseDraft(response);
+            lastAttemptStatus = draft.isPresent() ? "OPENAI" : "INVALID_PROVIDER_RESPONSE";
+            return draft;
+        } catch (RestClientResponseException exception) {
+            // Do not log the response body: it may contain provider details that do not belong in application logs.
+            lastAttemptStatus = "HTTP_" + exception.getStatusCode().value();
+            log.warn("OpenAI enrichment rejected with HTTP {}; using rules instead", exception.getStatusCode().value());
+            return Optional.empty();
+        } catch (ResourceAccessException exception) {
+            lastAttemptStatus = "CONNECTION_FAILED";
+            log.warn("OpenAI enrichment could not reach the provider; using rules instead");
+            return Optional.empty();
         } catch (Exception exception) {
-            log.warn("OpenAI enrichment unavailable ({}); using rules instead", exception.getClass().getSimpleName());
+            lastAttemptStatus = "REQUEST_FAILED";
+            log.warn("OpenAI enrichment failed before a response ({}); using rules instead", exception.getClass().getSimpleName());
             return Optional.empty();
         }
+    }
+
+    /** Safe, credential-free status of the last provider attempt for the admin console. */
+    public String lastAttemptStatus() {
+        return lastAttemptStatus;
     }
 
     private Map<String, Object> requestBody(Lead lead, List<Interaction> interactions, AiPolicy policy) {

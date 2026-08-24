@@ -32,4 +32,5 @@ public class LeadResponseDto {
     private String nextAction;
     private String suggestedReply;
     private Instant suggestedReplyGeneratedAt;
+    private String aiProviderStatus;
 }
