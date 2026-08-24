@@ -44,17 +44,17 @@ public class LeadAiService {
     }
 
     void applyDraft(Lead lead, LeadAiDraft draft) {
-        lead.setSummary(trimToNull(draft.summary()));
-        lead.setIntent(trimToNull(draft.intent()));
+        lead.setSummary(limit(draft.summary(), 2_000));
+        lead.setIntent(limit(draft.intent(), 120));
         lead.setScore(draft.score());
-        lead.setNextAction(trimToNull(draft.nextAction()));
-        lead.setSuggestedReply(trimToNull(draft.suggestedReply()));
+        lead.setNextAction(limit(draft.nextAction(), 500));
+        lead.setSuggestedReply(limit(draft.suggestedReply(), 2_000));
         lead.setSuggestedReplyGeneratedAt(
                 draft.suggestedReply() == null || draft.suggestedReply().isBlank() ? null : Instant.now()
         );
 
-        if (trimToNull(draft.desiredCategory()) != null) {
-            lead.setDesiredCategory(trimToNull(draft.desiredCategory()));
+        if (limit(draft.desiredCategory(), 80) != null) {
+            lead.setDesiredCategory(limit(draft.desiredCategory(), 80));
         }
 
         List<String> mergedTags = mergeTags(lead.getDesiredTags(), draft.desiredTags());
@@ -74,7 +74,7 @@ public class LeadAiService {
         }
 
         return mergedTags.stream()
-                .map(this::trimToNull)
+                .map(value -> limit(value, 64))
                 .filter(Objects::nonNull)
                 .distinct()
                 .collect(Collectors.toCollection(ArrayList::new));
@@ -87,5 +87,10 @@ public class LeadAiService {
 
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String limit(String value, int maximum) {
+        String normalized = trimToNull(value);
+        return normalized == null || normalized.length() <= maximum ? normalized : normalized.substring(0, maximum);
     }
 }

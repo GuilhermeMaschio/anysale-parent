@@ -85,4 +85,22 @@ class LeadAiServiceTest {
         verify(leadRepository).save(lead);
         verify(leadEventPublisher).publishLeadUpdated(lead, "AI_ENRICHMENT_UPDATED");
     }
+
+    @Test
+    void applyDraftConstrainsAiTextToPersistedColumnLimits() {
+        Lead lead = new Lead();
+        String oversized = "x".repeat(200);
+
+        service.applyDraft(lead, new LeadAiDraft(
+                oversized.repeat(20), oversized, oversized, List.of(oversized), 80,
+                oversized.repeat(4), oversized.repeat(20)
+        ));
+
+        assertThat(lead.getSummary()).hasSize(2_000);
+        assertThat(lead.getIntent()).hasSize(120);
+        assertThat(lead.getDesiredCategory()).hasSize(80);
+        assertThat(lead.getDesiredTags()).allSatisfy(tag -> assertThat(tag).hasSize(64));
+        assertThat(lead.getNextAction()).hasSize(500);
+        assertThat(lead.getSuggestedReply()).hasSize(2_000);
+    }
 }
