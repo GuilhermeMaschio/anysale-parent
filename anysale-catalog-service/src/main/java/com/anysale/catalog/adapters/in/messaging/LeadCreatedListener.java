@@ -18,7 +18,10 @@ public class LeadCreatedListener {
 
     @KafkaListener(topics = "lead.created", groupId = "catalog-service")
     public void on(LeadCreatedEvent evt){
-        List<Product> candidates = repo.findByCategory(evt.getDesiredCategory());
+        if (evt.getTenantId() == null || evt.getTenantId().isBlank()) return;
+        List<Product> candidates = repo.findByTenantIdAndCategoryAndAvailableTrueAndDeletedAtIsNull(evt.getTenantId(), evt.getDesiredCategory()).stream()
+                .filter(product -> product.getStockQuantity() > product.getReservedQuantity())
+                .toList();
         List<String> tags = evt.getDesiredTags() != null ? evt.getDesiredTags() : List.of();
 
         List<Map<String,Object>> top3 = candidates.stream()

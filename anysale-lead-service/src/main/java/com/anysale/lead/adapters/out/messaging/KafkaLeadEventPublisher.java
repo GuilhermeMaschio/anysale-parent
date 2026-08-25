@@ -47,6 +47,7 @@ public class KafkaLeadEventPublisher implements LeadEventPublisher {
         evt.setDesiredCategory(lead.getDesiredCategory());
         evt.setDesiredTags(lead.getDesiredTags());
         evt.setStage(lead.getStage());
+        evt.setTenantId(lead.getTenantId());
         return evt;
     }
 

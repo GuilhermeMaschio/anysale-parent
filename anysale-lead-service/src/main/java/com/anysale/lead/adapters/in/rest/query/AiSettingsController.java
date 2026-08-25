@@ -30,8 +30,9 @@ public class AiSettingsController {
 
     @PutMapping("/settings")
     public ResponseEntity<AiSettingsResponse> update(@Valid @RequestBody AiSettingsRequest request) {
-        AiSettings updated = aiSettingsService.update(request.enabled(), request.model(), request.maxOutputTokens(),
-                request.monthlyRequestLimit(), request.monthlyTokenLimit());
+        AiSettings updated = aiSettingsService.update(request.enabled(), request.model(), request.maxOutputTokens(), request.monthlyRequestLimit(), request.monthlyTokenLimit(),
+                request.serviceProfile(), request.tone(), request.formality(), request.responseLength(), request.commercialApproach(),
+                request.customInstructions(), request.approvedExamples(), request.rejectedExamples());
         return ResponseEntity.ok(toResponse(updated, aiSettingsService.policy()));
     }
 
@@ -45,6 +46,8 @@ public class AiSettingsController {
 
     private AiSettingsResponse toResponse(AiSettings settings, AiPolicy policy) {
         return new AiSettingsResponse(settings.isEnabled(), policy.providerAvailable(), policy.model(), settings.getMaxOutputTokens(),
-                settings.getMonthlyRequestLimit(), settings.getMonthlyTokenLimit(), aiSettingsService.allowedModels(), settings.getUpdatedAt());
+                settings.getMonthlyRequestLimit(), settings.getMonthlyTokenLimit(), aiSettingsService.allowedModels(),
+                settings.getServiceProfile(), settings.getTone(), settings.getFormality(), settings.getResponseLength(), settings.getCommercialApproach(),
+                settings.getCustomInstructions(), settings.getApprovedExamples(), settings.getRejectedExamples(), settings.getUpdatedAt());
     }
 }

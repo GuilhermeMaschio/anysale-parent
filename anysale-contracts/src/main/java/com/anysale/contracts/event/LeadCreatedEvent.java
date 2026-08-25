@@ -18,6 +18,7 @@ public class LeadCreatedEvent {
     private String desiredCategory;
     private List<String> desiredTags;
     private String stage;
+    private String tenantId;
 
     public LeadCreatedEvent() {
     }
@@ -65,6 +66,9 @@ public class LeadCreatedEvent {
     public String getStage() { return stage; }
     public void setStage(String stage) { this.stage = stage; }
 
+    public String getTenantId() { return tenantId; }
+    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
+
     // equals/hashCode/toString
     @Override
     public boolean equals(Object o) {
@@ -78,12 +82,13 @@ public class LeadCreatedEvent {
                 Objects.equals(source, that.source) &&
                 Objects.equals(desiredCategory, that.desiredCategory) &&
                 Objects.equals(desiredTags, that.desiredTags) &&
-                Objects.equals(stage, that.stage);
+                Objects.equals(stage, that.stage) &&
+                Objects.equals(tenantId, that.tenantId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, name, email, phone, source, desiredCategory, desiredTags, stage);
+        return Objects.hash(id, name, email, phone, source, desiredCategory, desiredTags, stage, tenantId);
     }
 
     @Override

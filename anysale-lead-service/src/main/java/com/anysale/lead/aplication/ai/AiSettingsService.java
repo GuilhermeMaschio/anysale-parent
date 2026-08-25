@@ -48,7 +48,9 @@ public class AiSettingsService {
     }
 
     @Transactional
-    public AiSettings update(boolean enabled, String model, int maxOutputTokens, Integer monthlyRequestLimit, Long monthlyTokenLimit) {
+    public AiSettings update(boolean enabled, String model, int maxOutputTokens, Integer monthlyRequestLimit, Long monthlyTokenLimit,
+                             String serviceProfile, String tone, String formality, String responseLength, String commercialApproach,
+                             String customInstructions, String approvedExamples, String rejectedExamples) {
         if (maxOutputTokens < 100 || maxOutputTokens > 4_000) {
             throw new IllegalArgumentException("maxOutputTokens must be between 100 and 4000");
         }
@@ -68,6 +70,14 @@ public class AiSettingsService {
         settings.setMaxOutputTokens(maxOutputTokens);
         settings.setMonthlyRequestLimit(monthlyRequestLimit);
         settings.setMonthlyTokenLimit(monthlyTokenLimit);
+        settings.setServiceProfile(orDefault(serviceProfile, "CONSULTATIVE"));
+        settings.setTone(orDefault(tone, "WARM"));
+        settings.setFormality(orDefault(formality, "BALANCED"));
+        settings.setResponseLength(orDefault(responseLength, "CONCISE"));
+        settings.setCommercialApproach(orDefault(commercialApproach, "DISCOVER_FIRST"));
+        settings.setCustomInstructions(blankToNull(customInstructions));
+        settings.setApprovedExamples(blankToNull(approvedExamples));
+        settings.setRejectedExamples(blankToNull(rejectedExamples));
         settings.setUpdatedAt(Instant.now());
         return settingsRepository.save(settings);
     }
@@ -104,6 +114,8 @@ public class AiSettingsService {
         settings.setEnabled(false);
         settings.setModel(blankToNull(defaultModel));
         settings.setMaxOutputTokens(700);
+        settings.setServiceProfile("CONSULTATIVE"); settings.setTone("WARM"); settings.setFormality("BALANCED");
+        settings.setResponseLength("CONCISE"); settings.setCommercialApproach("DISCOVER_FIRST");
         return settings;
     }
 
@@ -112,6 +124,7 @@ public class AiSettingsService {
     }
     private boolean hasText(String value) { return value != null && !value.isBlank(); }
     private String blankToNull(String value) { return hasText(value) ? value.trim() : null; }
+    private String orDefault(String value, String fallback) { return hasText(value) ? value.trim() : fallback; }
 
     public record UsageSummary(long requests, long inputTokens, long outputTokens, long totalTokens, String month) { }
 }
