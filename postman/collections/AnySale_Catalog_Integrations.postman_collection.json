@@ -1,0 +1,498 @@
+{
+  "info": {
+    "_postman_id": "c8a4192b-88bf-49f3-a12d-9876543210ab",
+    "name": "AnySale - Catalog Integrations",
+    "description": "Coleção de testes para validação de Integrações Externas de Catálogo no anysale-catalog-service.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "catalogServiceUrl",
+      "value": "http://localhost:8082",
+      "type": "string"
+    },
+    {
+      "key": "integrationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Catalog Integrations",
+      "item": [
+        {
+          "name": "1.1. Criar Integração",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Response has integration ID and hasCredentials flag', function () {",
+                  "    pm.expect(jsonData.id).to.be.a('string');",
+                  "    pm.expect(jsonData.hasCredentials).to.eql(true);",
+                  "    pm.expect(jsonData.encryptedCredentials).to.be.undefined;",
+                  "    pm.expect(jsonData.secret).to.be.undefined;",
+                  "});",
+                  "",
+                  "if (jsonData.id) {",
+                  "    pm.collectionVariables.set('integrationId', jsonData.id);",
+                  "    console.log('Saved integrationId: ' + jsonData.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "disabled": true
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"ERP DummyJSON Teste\",\n  \"providerType\": \"GENERIC_REST\",\n  \"baseUrl\": \"https://dummyjson.com/products\",\n  \"status\": \"ACTIVE\",\n  \"authType\": \"NONE\",\n  \"secret\": \"opcional_secret_token_123\",\n  \"apiKeyHeaderName\": \"X-API-Key\",\n  \"apiKeyQueryName\": \"api_key\",\n  \"syncMode\": \"MANUAL\",\n  \"conflictStrategy\": \"EXTERNAL_WINS\",\n  \"skuFallbackEnabled\": true,\n  \"fieldMapping\": {\n    \"sku\": \"sku\",\n    \"title\": \"title\",\n    \"price\": \"price\",\n    \"stockQuantity\": \"stock\",\n    \"category\": \"category\",\n    \"description\": \"description\",\n    \"imageUrl\": \"thumbnail\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{catalogServiceUrl}}/v1/catalog-integrations",
+              "host": [
+                "{{catalogServiceUrl}}"
+              ],
+              "path": [
+                "v1",
+                "catalog-integrations"
+              ]
+            },
+            "description": "Cria uma nova integração de catálogo externa."
+          },
+          "response": []
+        },
+        {
+          "name": "1.2. Listar Integrações",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Response is an array without secrets', function () {",
+                  "    pm.expect(jsonData).to.be.an('array');",
+                  "    if (jsonData.length > 0) {",
+                  "        pm.expect(jsonData[0].encryptedCredentials).to.be.undefined;",
+                  "        pm.expect(jsonData[0].secret).to.be.undefined;",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{catalogServiceUrl}}/v1/catalog-integrations",
+              "host": [
+                "{{catalogServiceUrl}}"
+              ],
+              "path": [
+                "v1",
+                "catalog-integrations"
+              ]
+            },
+            "description": "Lista todas as integrações cadastradas para o tenant."
+          },
+          "response": []
+        },
+        {
+          "name": "1.3. Consultar Integração por ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Integration ID matches variable', function () {",
+                  "    pm.expect(jsonData.id).to.eql(pm.collectionVariables.get('integrationId'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{catalogServiceUrl}}/v1/catalog-integrations/{{integrationId}}",
+              "host": [
+                "{{catalogServiceUrl}}"
+              ],
+              "path": [
+                "v1",
+                "catalog-integrations",
+                "{{integrationId}}"
+              ]
+            },
+            "description": "Retorna os detalhes da integração criada."
+          },
+          "response": []
+        },
+        {
+          "name": "1.4. Testar Conexão",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Connection test returns success', function () {",
+                  "    pm.expect(jsonData.success).to.be.a('boolean');",
+                  "    pm.expect(jsonData.statusCode).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{catalogServiceUrl}}/v1/catalog-integrations/{{integrationId}}/test",
+              "host": [
+                "{{catalogServiceUrl}}"
+              ],
+              "path": [
+                "v1",
+                "catalog-integrations",
+                "{{integrationId}}",
+                "test"
+              ]
+            },
+            "description": "Testa a comunicação HTTP com a API externa configurada."
+          },
+          "response": []
+        },
+        {
+          "name": "1.5. Visualizar Prévia",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Preview returns totalItems and items array', function () {",
+                  "    pm.expect(jsonData.totalItems).to.be.a('number');",
+                  "    pm.expect(jsonData.items).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{catalogServiceUrl}}/v1/catalog-integrations/{{integrationId}}/preview",
+              "host": [
+                "{{catalogServiceUrl}}"
+              ],
+              "path": [
+                "v1",
+                "catalog-integrations",
+                "{{integrationId}}",
+                "preview"
+              ]
+            },
+            "description": "Retorna uma amostragem normalizada dos dados da origem sem persistir no banco."
+          },
+          "response": []
+        },
+        {
+          "name": "1.6. Disparar Sincronização Assíncrona",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Sync status is IN_PROGRESS', function () {",
+                  "    pm.expect(jsonData.status).to.eql('IN_PROGRESS');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{catalogServiceUrl}}/v1/catalog-integrations/{{integrationId}}/sync",
+              "host": [
+                "{{catalogServiceUrl}}"
+              ],
+              "path": [
+                "v1",
+                "catalog-integrations",
+                "{{integrationId}}",
+                "sync"
+              ]
+            },
+            "description": "Inicia a importação/sincronização de produtos em segundo plano."
+          },
+          "response": []
+        },
+        {
+          "name": "1.7. Histórico de Execuções (Auditoria)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Executions list returned', function () {",
+                  "    pm.expect(jsonData).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{catalogServiceUrl}}/v1/catalog-integrations/{{integrationId}}/executions",
+              "host": [
+                "{{catalogServiceUrl}}"
+              ],
+              "path": [
+                "v1",
+                "catalog-integrations",
+                "{{integrationId}}",
+                "executions"
+              ]
+            },
+            "description": "Consulta o histórico de sincronizações executadas com contagens de auditoria."
+          },
+          "response": []
+        },
+        {
+          "name": "1.8. Atualizar Integração",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Conflict strategy updated', function () {",
+                  "    pm.expect(jsonData.conflictStrategy).to.eql('LOCAL_WINS');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "disabled": true
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"ERP DummyJSON Teste (Atualizado)\",\n  \"baseUrl\": \"https://dummyjson.com/products\",\n  \"conflictStrategy\": \"LOCAL_WINS\",\n  \"skuFallbackEnabled\": true,\n  \"fieldMapping\": {\n    \"sku\": \"sku\",\n    \"title\": \"title\",\n    \"price\": \"price\",\n    \"stockQuantity\": \"stock\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{catalogServiceUrl}}/v1/catalog-integrations/{{integrationId}}",
+              "host": [
+                "{{catalogServiceUrl}}"
+              ],
+              "path": [
+                "v1",
+                "catalog-integrations",
+                "{{integrationId}}"
+              ]
+            },
+            "description": "Atualiza as configurações de uma integração existente."
+          },
+          "response": []
+        },
+        {
+          "name": "1.9. Excluir Integração",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 204 No Content', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{catalogServiceUrl}}/v1/catalog-integrations/{{integrationId}}",
+              "host": [
+                "{{catalogServiceUrl}}"
+              ],
+              "path": [
+                "v1",
+                "catalog-integrations",
+                "{{integrationId}}"
+              ]
+            },
+            "description": "Remove uma integração do banco de dados."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Verificação de Produtos Importados",
+      "item": [
+        {
+          "name": "2.1. Listar Produtos do Catálogo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{catalogServiceUrl}}/v1/products",
+              "host": [
+                "{{catalogServiceUrl}}"
+              ],
+              "path": [
+                "v1",
+                "products"
+              ]
+            },
+            "description": "Lista todos os produtos do catálogo do tenant (incluindo os importados)."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

@@ -156,6 +156,12 @@ O contrato completo, exemplos de payload e endpoints estão em [docs/n8n-contrac
 | Notification | `POST /v1/notifications/whatsapp/messages/suggested` | Envia a última resposta sugerida para o lead. |
 | Catalog | `POST /v1/products` | Inclui produtos no catálogo. |
 | Catalog | `GET /v1/products` | Lista produtos. |
+| Catalog | `GET /v1/catalog-integrations` | Lista integrações de catálogo externas do tenant (requer role `ADMIN`). |
+| Catalog | `POST /v1/catalog-integrations` | Cria nova integração de catálogo genérica REST. |
+| Catalog | `POST /v1/catalog-integrations/{id}/test` | Testa conexão com a API externa. |
+| Catalog | `POST /v1/catalog-integrations/{id}/preview` | Traz prévia dos dados normalizados sem persistir. |
+| Catalog | `POST /v1/catalog-integrations/{id}/sync` | Dispara sincronização manual de produtos em segundo plano. |
+
 
 A coleção de testes locais está em [postman/collections/AnySale (Local).postman_collection.json](<postman/collections/AnySale (Local).postman_collection.json>).
 
