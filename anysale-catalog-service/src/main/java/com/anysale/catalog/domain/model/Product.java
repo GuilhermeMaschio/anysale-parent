@@ -24,6 +24,9 @@ public class Product {
     private int reorderPoint;
     private String imageId;
     private String imageContentType;
+    private String source = "LOCAL";
+    private String externalProductId;
+    private Instant lastSyncedAt;
     private Instant createdAt;
     private Instant updatedAt;
     private Instant deletedAt;
@@ -33,6 +36,12 @@ public class Product {
     public void setId(String id) { this.id = id; }
     public String getTenantId() { return tenantId; }
     public void setTenantId(String tenantId) { this.tenantId = tenantId; }
+    public String getSource() { return source; }
+    public void setSource(String source) { this.source = source; }
+    public String getExternalProductId() { return externalProductId; }
+    public void setExternalProductId(String externalProductId) { this.externalProductId = externalProductId; }
+    public Instant getLastSyncedAt() { return lastSyncedAt; }
+    public void setLastSyncedAt(Instant lastSyncedAt) { this.lastSyncedAt = lastSyncedAt; }
     public String getSku() { return sku; }
     public void setSku(String sku) { this.sku = sku; }
     public String getTitle() { return title; }
@@ -68,3 +77,4 @@ public class Product {
     public Instant getDeletedAt() { return deletedAt; }
     public void setDeletedAt(Instant deletedAt) { this.deletedAt = deletedAt; }
 }
+

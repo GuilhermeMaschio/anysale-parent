@@ -23,7 +23,7 @@ class LeadQueryClientTest {
         LeadQueryClient client = new LeadQueryClient(builder.build());
         UUID leadId = UUID.fromString("6f4ff1a0-df0d-431e-b769-b57ec71b7127");
 
-        server.expect(requestTo("http://lead-service/v1/leads/6f4ff1a0-df0d-431e-b769-b57ec71b7127"))
+        server.expect(requestTo("http://lead-service/v1/internal/leads/6f4ff1a0-df0d-431e-b769-b57ec71b7127"))
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("""
                         {
