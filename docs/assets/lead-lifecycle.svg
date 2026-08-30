@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="750" height="180" viewBox="0 0 750 180" role="img" aria-labelledby="title desc">
+  <title id="title">Ciclo de vida do lead</title><desc id="desc">Novo contato passa por atendimento e qualificacao ate venda ganha ou perdida.</desc>
+  <style>.b{fill:#f8fafc;stroke:#475569;stroke-width:2}.win{fill:#ecfdf5;stroke:#059669;stroke-width:2}.lose{fill:#fef2f2;stroke:#dc2626;stroke-width:2}.t{font:600 16px Arial;fill:#1e293b}.l{stroke:#64748b;stroke-width:2;marker-end:url(#a)}</style><defs><marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#64748b"/></marker></defs>
+  <rect class="b" x="20" y="65" width="120" height="50" rx="25"/><text class="t" x="80" y="96" text-anchor="middle">Novo contato</text>
+  <rect class="b" x="205" y="65" width="130" height="50" rx="25"/><text class="t" x="270" y="96" text-anchor="middle">Em atendimento</text>
+  <rect class="b" x="400" y="65" width="115" height="50" rx="25"/><text class="t" x="457" y="96" text-anchor="middle">Qualificado</text>
+  <rect class="win" x="580" y="25" width="130" height="50" rx="25"/><text class="t" x="645" y="56" text-anchor="middle">Venda ganha</text>
+  <rect class="lose" x="580" y="110" width="130" height="50" rx="25"/><text class="t" x="645" y="141" text-anchor="middle">Perdido</text>
+  <path class="l" d="M140 90H205M335 90H400M515 82L580 55M335 107L580 135M515 102L580 135"/>
+</svg>

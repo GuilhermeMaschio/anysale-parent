@@ -2,6 +2,7 @@ package com.anysale.lead.domain.model;
 
 import jakarta.persistence.*;
 import java.time.Instant;
+import java.math.BigDecimal;
 import java.util.*;
 
 @Entity
@@ -17,10 +18,18 @@ public class Lead {
     private String phone;
     private String source;
 
+    @Column(name = "tenant_id", nullable = false, updatable = false, length = 64)
+    private String tenantId;
+
     @Column(name = "desired_category")
     private String desiredCategory;
 
     private String stage;
+    @Column(name = "assigned_to") private String assignedTo;
+    @Column(name = "estimated_value", precision = 14, scale = 2) private BigDecimal estimatedValue;
+    @Column(name = "actual_value", precision = 14, scale = 2) private BigDecimal actualValue;
+    @Column(name = "lost_reason", length = 500) private String lostReason;
+    @Column(name = "closed_at") private Instant closedAt;
 
     @Column(name = "last_message", length = 2000)
     private String lastMessage;
@@ -38,6 +47,12 @@ public class Lead {
 
     @Column(name = "next_action", length = 500)
     private String nextAction;
+
+    @Column(name = "suggested_reply", length = 2000)
+    private String suggestedReply;
+
+    @Column(name = "suggested_reply_generated_at")
+    private Instant suggestedReplyGeneratedAt;
 
     // coleção de tags em tabela própria
     @ElementCollection
@@ -72,10 +87,17 @@ public class Lead {
     public void setPhone(String phone) { this.phone = phone; }
     public String getSource() { return source; }
     public void setSource(String source) { this.source = source; }
+    public String getTenantId() { return tenantId; }
+    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
     public String getDesiredCategory() { return desiredCategory; }
     public void setDesiredCategory(String desiredCategory) { this.desiredCategory = desiredCategory; }
     public String getStage() { return stage; }
     public void setStage(String stage) { this.stage = stage; }
+    public String getAssignedTo() { return assignedTo; } public void setAssignedTo(String v) { assignedTo = v; }
+    public BigDecimal getEstimatedValue() { return estimatedValue; } public void setEstimatedValue(BigDecimal v) { estimatedValue = v; }
+    public BigDecimal getActualValue() { return actualValue; } public void setActualValue(BigDecimal v) { actualValue = v; }
+    public String getLostReason() { return lostReason; } public void setLostReason(String v) { lostReason = v; }
+    public Instant getClosedAt() { return closedAt; } public void setClosedAt(Instant v) { closedAt = v; }
     public String getLastMessage() { return lastMessage; }
     public void setLastMessage(String lastMessage) { this.lastMessage = lastMessage; }
     public Instant getLastInteractionAt() { return lastInteractionAt; }
@@ -88,6 +110,10 @@ public class Lead {
     public void setScore(Integer score) { this.score = score; }
     public String getNextAction() { return nextAction; }
     public void setNextAction(String nextAction) { this.nextAction = nextAction; }
+    public String getSuggestedReply() { return suggestedReply; }
+    public void setSuggestedReply(String suggestedReply) { this.suggestedReply = suggestedReply; }
+    public Instant getSuggestedReplyGeneratedAt() { return suggestedReplyGeneratedAt; }
+    public void setSuggestedReplyGeneratedAt(Instant suggestedReplyGeneratedAt) { this.suggestedReplyGeneratedAt = suggestedReplyGeneratedAt; }
     public List<String> getDesiredTags() { return desiredTags; }
     public void setDesiredTags(List<String> desiredTags) { this.desiredTags = desiredTags; }
     public Instant getCreatedAt() { return createdAt; }

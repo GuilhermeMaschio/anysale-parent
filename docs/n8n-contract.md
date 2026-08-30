@@ -1,15 +1,29 @@
 # n8n Contract
 
-This document is the authoritative contract for the current WhatsApp inbound MVP flow.
+This document is the authoritative contract for the current WhatsApp + n8n MVP flow.
+
+## Shared Internal Token
+
+When `ANYSALE_INTERNAL_TOKEN` is configured, the protected automation endpoints below expect:
+
+`X-Internal-Token: <shared-token>`
+
+Use the same shared token in:
+- `anysale-ingestion-gateway`
+- `anysale-lead-service`
+- `anysale-notification-service`
+- `n8n` or any other trusted internal caller
+
+If `ANYSALE_INTERNAL_TOKEN` is blank, these checks stay disabled for local development.
 
 ## Recommended Flow
 
-1. Meta sends WhatsApp Cloud API webhooks directly to the gateway endpoint:
+1. Meta sends WhatsApp Cloud API webhooks directly to the gateway endpoint with the `messages` and `statuses` subscribed fields:
    `GET/POST http://localhost:8083/v1/whatsapp/webhook`
-2. The gateway validates the webhook challenge/signature, extracts text messages, and normalizes them.
-3. The gateway forwards the message to the lead service.
-4. The lead service creates or updates the lead, persists the interaction, and updates:
-   `lastMessage`, `lastInteractionAt`, and `stage`.
+2. The gateway validates the webhook challenge/signature, extracts text messages, normalizes them, and forwards outbound status updates to the lead service.
+3. The lead service creates or updates the lead, persists inbound and outbound interactions, keeps delivery state attached to the same interaction via `externalMessageId`, and regenerates the current AI draft from the conversation.
+4. The lead service updates:
+   `lastMessage`, `lastInteractionAt`, `stage`, `summary`, `intent`, `score`, `nextAction`, and `suggestedReply`.
 5. n8n can still be used for local testing or later downstream automations through the normalized gateway endpoint:
    `POST http://localhost:8083/v1/messages/incoming`
 6. n8n sends the AI result back to:
@@ -17,6 +31,9 @@ This document is the authoritative contract for the current WhatsApp inbound MVP
 7. n8n can fetch the latest lead state and the interaction history with:
    `GET http://localhost:8080/v1/leads/{leadId}`
    `GET http://localhost:8080/v1/leads/{leadId}/interactions`
+8. AnySale can send a manual WhatsApp response or the latest AI suggested reply through:
+   `POST http://localhost:8081/v1/notifications/whatsapp/messages`
+   `POST http://localhost:8081/v1/notifications/whatsapp/messages/suggested`
 
 ## Endpoint Summary
 
@@ -92,7 +109,8 @@ Message webhook request from Meta:
 
 Current behavior:
 - Text messages are mapped to the internal incoming message contract.
-- Status-only webhook payloads are acknowledged with `200 OK` and ignored.
+- Status webhook payloads are mapped by `messageId` and forwarded to the lead service.
+- Delivery events are persisted on the matching interaction as `deliveryStatus`, `deliveryStatusAt`, and optional failure details.
 - Unsupported message types are ignored for now.
 - Invalid signatures return `403 Forbidden`.
 - Invalid JSON returns `400 Bad Request`.
@@ -105,6 +123,8 @@ Recommended external endpoint for n8n:
 
 Service:
 `anysale-ingestion-gateway`
+
+Protected with `X-Internal-Token` when `ANYSALE_INTERNAL_TOKEN` is configured.
 
 Request body:
 
@@ -143,10 +163,12 @@ Response body:
     "stage": "CONTACTED",
     "lastMessage": "Quero saber mais sobre cadeira ergonomica",
     "lastInteractionAt": "2026-04-20T01:12:30Z",
-    "summary": null,
-    "intent": null,
-    "score": null,
-    "nextAction": null
+    "summary": "Lead inbound no WhatsApp pedindo detalhes sobre cadeira ergonomica.",
+    "intent": "BUYING",
+    "score": 85,
+    "nextAction": "Responder rapido no WhatsApp com opcoes e faixa de preco.",
+    "suggestedReply": "Oi! Posso te mandar algumas opcoes de cadeira ergonomica com preco e entrega.",
+    "suggestedReplyGeneratedAt": "2026-05-24T22:10:00Z"
   }
 }
 ```
@@ -159,6 +181,8 @@ Internal endpoint used by the gateway:
 
 Service:
 `anysale-lead-service`
+
+Protected with `X-Internal-Token` when `ANYSALE_INTERNAL_TOKEN` is configured.
 
 Request body:
 
@@ -186,19 +210,256 @@ Response body:
   "stage": "CONTACTED",
   "lastMessage": "Quero saber mais sobre cadeira ergonomica",
   "lastInteractionAt": "2026-04-20T01:12:30Z",
-  "summary": null,
-  "intent": null,
-  "score": null,
-  "nextAction": null
+  "summary": "Lead inbound no WhatsApp pedindo detalhes sobre cadeira ergonomica.",
+  "intent": "BUYING",
+  "score": 85,
+  "nextAction": "Responder rapido no WhatsApp com opcoes e faixa de preco.",
+  "suggestedReply": "Oi! Posso te mandar algumas opcoes de cadeira ergonomica com preco e entrega.",
+  "suggestedReplyGeneratedAt": "2026-05-24T22:10:00Z"
 }
 ```
 
-### 4. Enrich Lead With AI Result
+### 4. Send WhatsApp Text Message
+
+Manual outbound endpoint:
+
+`POST /v1/notifications/whatsapp/messages`
+
+Service:
+`anysale-notification-service`
+
+Required runtime settings:
+- `WHATSAPP_ACCESS_TOKEN`: Meta access token with `whatsapp_business_messaging`.
+- `WHATSAPP_PHONE_NUMBER_ID`: WhatsApp business phone number ID.
+- `WHATSAPP_GRAPH_API_VERSION`: optional Graph API version. Defaults to `v20.0`.
+- `WHATSAPP_GRAPH_API_BASE_URL`: optional Graph API base URL. Defaults to `https://graph.facebook.com`.
+- `LEAD_SERVICE_BASE_URL`: optional lead service base URL. Defaults to `http://localhost:8080`.
+
+Protected with `X-Internal-Token` when `ANYSALE_INTERNAL_TOKEN` is configured.
+
+#### Console integration boundary
+
+This is a **server-to-server** endpoint. The browser-based AnySale Console must
+not call it directly and must never receive `X-Internal-Token`,
+`WHATSAPP_ACCESS_TOKEN`, or `WHATSAPP_PHONE_NUMBER_ID`. A Console BFF/API
+gateway authenticated for the operator must call this endpoint server-side and
+inject `X-Internal-Token`. No such BFF route is implemented in this repository
+today, so pointing `VITE_LEAD_SERVICE_URL` at notification-service will not
+activate the composer safely.
+
+Request body:
+
+```json
+{
+  "leadId": "3c04b6f5-91e2-4524-bf0f-1f2ce58d0d3b",
+  "to": "5541999999999",
+  "message": "Oi, posso te ajudar com a cadeira ergonomica."
+}
+```
+
+Response body:
+
+```json
+{
+  "leadId": "3c04b6f5-91e2-4524-bf0f-1f2ce58d0d3b",
+  "to": "5541999999999",
+  "waId": "5541999999999",
+  "messageId": "wamid.HBgNNTU0MTk5OTk5OTk5ORUCABIYFDk4Rjc4AA",
+  "status": "SENT"
+}
+```
+
+Current behavior:
+- Sends a WhatsApp text message with `preview_url=false`.
+- Uses the Meta endpoint `POST /{version}/{phone-number-id}/messages`.
+- If `leadId` is present, persists an `OUT` interaction in the lead service.
+- The returned `messageId` becomes the correlation key used later by Meta status webhooks.
+
+Validation and errors:
+- `400 Bad Request`: `to` or `message` is blank, or `leadId` is not a UUID.
+- `401 Unauthorized`: `ANYSALE_INTERNAL_TOKEN` is configured and the supplied
+  `X-Internal-Token` is absent or invalid.
+- `503 Service Unavailable`: WhatsApp outbound is disabled because
+  `WHATSAPP_PHONE_NUMBER_ID` or `WHATSAPP_ACCESS_TOKEN` is missing. The error
+  identifies the missing setting but never exposes its value.
+- Meta/API failures are propagated as their HTTP status; no `OUT` interaction
+  is recorded unless Meta first accepts the send.
+
+### Console-safe WhatsApp send
+
+The Console calls the lead-service, never notification-service directly:
+
+`POST /v1/leads/{leadId}/whatsapp/messages`
+
+Request body:
+
+```json
+{ "message": "Oi, posso te ajudar com a cadeira ergonomica." }
+```
+
+The lead-service loads and normalizes the lead phone, then calls the internal
+notification endpoint with `X-Internal-Token`. The response is the same `200`
+payload as the manual notification endpoint. It returns `400` if the message
+is blank/over 2000 characters or the lead has no phone, `404` if the lead does
+not exist, and propagates notification availability/failure status without
+exposing internal or Meta secrets.
+
+When `ANYSALE_SECURITY_ENABLED=true`, this endpoint requires a Keycloak JWT
+with `SALES_AGENT`, `SALES_MANAGER`, or `ADMIN` in either `realm_access.roles`
+or `resource_access.<ANYSALE_SECURITY_KEYCLOAK_CLIENT_ID>.roles`. All other
+`/v1/**` endpoints require an authenticated JWT. Health/info remain public.
+
+### Send Suggested WhatsApp Message
+
+Manual outbound endpoint that reuses the latest AI draft for the lead:
+
+`POST /v1/notifications/whatsapp/messages/suggested`
+
+Service:
+`anysale-notification-service`
+
+Protected with `X-Internal-Token` when `ANYSALE_INTERNAL_TOKEN` is configured.
+
+Request body:
+
+```json
+{
+  "leadId": "3c04b6f5-91e2-4524-bf0f-1f2ce58d0d3b",
+  "to": "5541999999999"
+}
+```
+
+Field rules:
+- `leadId`: required.
+- `to`: optional. If omitted, the notification service uses the lead phone from the CRM snapshot.
+
+Response body:
+
+```json
+{
+  "leadId": "3c04b6f5-91e2-4524-bf0f-1f2ce58d0d3b",
+  "to": "5541999999999",
+  "waId": "5541999999999",
+  "messageId": "wamid.HBgNNTU0MTk5OTk5OTk5ORUCABIYFDk4Rjc4AB",
+  "status": "SENT"
+}
+```
+
+Current behavior:
+- Fetches the latest lead snapshot from `GET /v1/leads/{leadId}`.
+- Uses `suggestedReply` as the outbound message body.
+- Returns `400 Bad Request` if the lead does not have a phone or a generated suggestion yet.
+- Persists the outbound interaction exactly like the manual text endpoint.
+
+### 5. Record Outbound Interaction
+
+Internal endpoint used by the notification service after a successful WhatsApp send:
+
+`POST /v1/leads/{leadId}/interactions/outbound`
+
+Service:
+`anysale-lead-service`
+
+Protected with `X-Internal-Token` when `ANYSALE_INTERNAL_TOKEN` is configured.
+
+Request body:
+
+```json
+{
+  "message": "Oi, posso te ajudar com a cadeira ergonomica.",
+  "channel": "WHATSAPP",
+  "externalMessageId": "wamid.HBgNNTU0MTk5OTk5OTk5ORUCABIYFDk4Rjc4AA"
+}
+```
+
+Response body:
+
+```json
+{
+  "id": "b0906265-b6f8-4e85-9c94-8743ef73c0a1",
+  "message": "Oi, posso te ajudar com a cadeira ergonomica.",
+  "channel": "WHATSAPP",
+  "direction": "OUT",
+  "externalMessageId": "wamid.HBgNNTU0MTk5OTk5OTk5ORUCABIYFDk4Rjc4AA",
+  "createdAt": "2026-04-21T16:00:00Z"
+}
+```
+
+Current behavior:
+- The lead service updates `lastMessage` and `lastInteractionAt` with the outbound message.
+- `externalMessageId` is used as an idempotency key per channel.
+- Repeated calls with the same `channel` and `externalMessageId` return the existing interaction.
+
+### Regenerate AI Enrichment From Conversation
+
+`POST /v1/leads/{leadId}/ai-enrichment`
+
+Service:
+`anysale-lead-service`
+
+Protected with `X-Internal-Token` when `ANYSALE_INTERNAL_TOKEN` is configured.
+
+Response body:
+
+```json
+{
+  "id": "3c04b6f5-91e2-4524-bf0f-1f2ce58d0d3b",
+  "name": "Contato 5541999999999",
+  "phone": "5541999999999",
+  "stage": "CONTACTED",
+  "summary": "Lead com alta intencao de compra buscando cadeira ergonomica para home office.",
+  "intent": "BUYING",
+  "score": 92,
+  "nextAction": "Enviar catalogo e abrir atendimento humano.",
+  "suggestedReply": "Oi! Posso te mandar algumas opcoes de cadeira ergonomica com faixa de preco.",
+  "suggestedReplyGeneratedAt": "2026-05-24T22:10:00Z"
+}
+```
+
+Current behavior:
+- Rebuilds `summary`, `intent`, `desiredCategory`, `desiredTags`, `score`, `nextAction`, and `suggestedReply` from the saved conversation.
+- Updates `suggestedReplyGeneratedAt`.
+
+### 6. Sync WhatsApp Delivery Status
+
+Internal endpoint used by the gateway after receiving a Meta status webhook:
+
+`POST /v1/leads/interactions/status`
+
+Service:
+`anysale-lead-service`
+
+Protected with `X-Internal-Token` when `ANYSALE_INTERNAL_TOKEN` is configured.
+
+Request body:
+
+```json
+{
+  "channel": "WHATSAPP",
+  "externalMessageId": "wamid.HBgNNTU0MTk5OTk5OTk5ORUCABIYFDk4Rjc4AA",
+  "status": "delivered",
+  "statusTimestamp": "2026-05-09T15:05:00Z",
+  "recipientId": "5541999999999",
+  "errorCode": null,
+  "errorTitle": null,
+  "errorMessage": null
+}
+```
+
+Current behavior:
+- Matches the existing interaction by `channel + externalMessageId`.
+- Ignores unknown message IDs so the webhook can still return `200 OK` to Meta.
+- Ignores stale status updates when the incoming timestamp is older than the current saved delivery timestamp.
+- Persists `deliveryStatus`, `deliveryStatusAt`, `deliveryRecipientId`, and failure details when present.
+
+### 7. Enrich Lead With AI Result
 
 `PATCH /v1/leads/{leadId}/enrichment`
 
 Service:
 `anysale-lead-service`
+
+Protected with `X-Internal-Token` when `ANYSALE_INTERNAL_TOKEN` is configured.
 
 Request body:
 
@@ -244,16 +505,20 @@ Response body:
   "summary": "Lead com alta intencao de compra buscando cadeira ergonomica para home office.",
   "intent": "BUYING",
   "score": 92,
-  "nextAction": "Enviar catalogo de cadeiras e oferecer atendimento humano."
+  "nextAction": "Enviar catalogo de cadeiras e oferecer atendimento humano.",
+  "suggestedReply": "Oi! Posso te mandar algumas opcoes de cadeira ergonomica com faixa de preco.",
+  "suggestedReplyGeneratedAt": "2026-05-24T22:10:00Z"
 }
 ```
 
-### 5. Get Lead
+### 8. Get Lead
 
 `GET /v1/leads/{leadId}`
 
 Service:
 `anysale-lead-service`
+
+Protected with `X-Internal-Token` when `ANYSALE_INTERNAL_TOKEN` is configured.
 
 Example response:
 
@@ -280,12 +545,14 @@ Example response:
 }
 ```
 
-### 6. Get Interaction History
+### 9. Get Interaction History
 
 `GET /v1/leads/{leadId}/interactions`
 
 Service:
 `anysale-lead-service`
+
+Protected with `X-Internal-Token` when `ANYSALE_INTERNAL_TOKEN` is configured.
 
 Example response:
 
@@ -297,14 +564,26 @@ Example response:
     "channel": "WHATSAPP",
     "direction": "IN",
     "externalMessageId": "wamid.001",
+    "deliveryStatus": null,
+    "deliveryStatusAt": null,
+    "deliveryRecipientId": null,
+    "deliveryErrorCode": null,
+    "deliveryErrorTitle": null,
+    "deliveryErrorMessage": null,
     "createdAt": "2026-04-18T13:15:30Z"
   },
   {
     "id": "0f8d6b88-0d4d-4f08-a778-e31f92aa81be",
-    "message": "Pode me mandar o catalogo?",
+    "message": "Oi, posso te ajudar com a cadeira ergonomica.",
     "channel": "WHATSAPP",
-    "direction": "IN",
+    "direction": "OUT",
     "externalMessageId": "wamid.002",
+    "deliveryStatus": "READ",
+    "deliveryStatusAt": "2026-05-09T15:05:00Z",
+    "deliveryRecipientId": "5541999999999",
+    "deliveryErrorCode": null,
+    "deliveryErrorTitle": null,
+    "deliveryErrorMessage": null,
     "createdAt": "2026-04-18T13:17:10Z"
   }
 ]
@@ -315,6 +594,7 @@ Example response:
 - The WhatsApp MVP still identifies leads by `phone`.
 - Instagram support will require a channel identity such as `externalContactId`.
 - The lead snapshot returned by inbound reflects the state right after persistence, before any later asynchronous enrichment or follow-up processing.
+- Meta will only send status updates back if the app subscription includes the `statuses` field and the webhook URL is publicly reachable over HTTPS in the target environment.
 
 ## Postman
 

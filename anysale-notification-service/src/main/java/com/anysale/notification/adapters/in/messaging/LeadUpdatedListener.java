@@ -21,4 +21,9 @@ public class LeadUpdatedListener {
     public static List<String> byLead(UUID id){
         return store.getOrDefault(id, List.of());
     }
+
+    public static void recordWhatsAppOutbound(UUID leadId, String messageId, String message) {
+        store.computeIfAbsent(leadId, k -> new CopyOnWriteArrayList<>())
+                .add("whatsapp.outbound messageId=" + messageId + ", message=" + message);
+    }
 }

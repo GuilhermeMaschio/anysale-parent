@@ -1,200 +1,201 @@
-AnySale
+# AnySale
 
-Gerenciador de leads com sugestões automáticas e notificações.
-Arquitetura hexagonal · Spring Boot · Kafka · Postgres (leads) · MongoDB (catálogo).
+Plataforma de atendimento e gestão de leads para transformar mensagens de clientes em oportunidades organizadas, priorizadas e prontas para conversão.
 
-Sumário
+O MVP atual recebe conversas do WhatsApp, consolida o histórico de cada contato, gera uma leitura comercial da conversa e sugere a próxima resposta. O time mantém a decisão final: a sugestão pode ser revisada e enviada manualmente pelo WhatsApp.
 
-Visão geral
-Módulos (Maven)
-Stack & Pré-requisitos
-Infra (Docker Compose)
-Configuração por serviço
-Lead Service (8080)
-Catalog Service (8082)
-Notification Service (8081)
-Ingestion Gateway (8083)
-Build & Run
-Endpoints principais
-Eventos (Kafka)
-Modelo de dados (Postgres)
-Troubleshooting
-Roadmap curto
-Appendix A — Criação de tópicos Kafka via Spring
+> Arquitetura hexagonal · Java 17 · Spring Boot · Kafka · PostgreSQL · MongoDB · n8n · WhatsApp Cloud API
 
-Visão geral
-Fluxo: ingestion-gateway → lead-service → (Kafka) → catalog-service → lead-service → notification-service
-Eventos: lead.created (novo lead) · lead.updated (mudanças/sugestões)
+> Para preparar uma máquina de desenvolvimento do zero, consulte o [guia de onboarding](docs/onboarding.md).
 
-Arquitetura por serviço (hexagonal):
-com.anysale.<service>
-├─ domain/            # regras e modelos de domínio
-├─ application/       # casos de uso
-├─ adapters/
-│   ├─ in/            # REST, Messaging (Kafka)
-│   └─ out/           # Persistence (JPA/Mongo), HTTP (WebClient), Messaging (Kafka)
-└─ config/            # beans infra (tópicos Kafka, etc.)
+## Objetivo do produto
 
-Módulos (Maven)
-anysale-parent/                 # parent (packaging=pom)
-├─ infra/docker-compose.yml   # Postgres, Mongo, Kafka
-├─ anysale-shared-kernel/     # VOs/util (sem Spring)
-├─ anysale-contracts/         # DTOs de eventos (Kafka) compartilhados
-├─ anysale-lead-service/      # JPA/Postgres + produz eventos
-├─ anysale-catalog-service/   # Mongo + consome lead.created + sugere
-├─ anysale-notification-service/ # consome lead.updated + histórico
-└─ anysale-ingestion-gateway/ # WebFlux → proxy/normalizador de leads
+Reduzir o tempo entre uma mensagem de interesse e uma resposta comercial relevante. Em vez de tratar cada conversa isoladamente, o AnySale mantém um lead com contexto, intenção, pontuação, histórico e recomendações de produto.
 
-Stack & Pré-requisitos
-Java 17, Maven 3.9+, Docker + Docker Compose
-Spring Boot 3.5.x · Web/MVC · WebFlux (gateway) · Data JPA/Mongo · Kafka · Flyway · Actuator
-IntelliJ IDEA (habilite Lombok)
-Infra (Docker Compose)
-Arquivo: infra/docker-compose.yml
+O fluxo prioriza três resultados:
 
-Subir:
+- **Atendimento rápido:** uma mensagem recebida cria ou atualiza o lead automaticamente.
+- **Contexto comercial:** a conversa vira resumo, intenção, score, próxima ação e resposta sugerida.
+- **Ação rastreável:** mensagens enviadas e os status `sent`, `delivered`, `read` e `failed` ficam associados ao histórico do lead.
+
+## O que já está pronto
+
+| Capacidade | Situação atual |
+| --- | --- |
+| Entrada de mensagens | Webhook direto da WhatsApp Cloud API e endpoint normalizado para n8n/integradores. |
+| Identificação do lead | Criação ou atualização por telefone normalizado, com deduplicação por `externalMessageId`. |
+| Histórico da conversa | Interações de entrada e saída persistidas no PostgreSQL. |
+| Leitura comercial | Assistente baseado em regras gera resumo, intenção, categoria/tags, score, próxima ação e resposta sugerida. |
+| Resposta WhatsApp | Envio manual de texto ou da resposta sugerida, via WhatsApp Cloud API. |
+| Acompanhamento de envio | Atualizações de status da Meta persistidas na interação correspondente. |
+| Catálogo e recomendações | Catálogo no MongoDB e sugestões de produtos assíncronas por Kafka. |
+| Segurança interna | Endpoints de automação aceitam `X-Internal-Token` quando `ANYSALE_INTERNAL_TOKEN` está configurado. |
+| Operação local | Docker Compose com PostgreSQL, MongoDB, Kafka, n8n e Keycloak. |
+
+## Visão da arquitetura
+
+![Arquitetura do AnySale](docs/assets/architecture.svg)
+
+Cada serviço segue o padrão hexagonal: regras de negócio ficam no domínio/aplicação; REST, Kafka, banco de dados e integrações externas ficam nos adaptadores.
+
+## Jornada de uma conversa
+
+![Jornada de uma conversa](docs/assets/conversation-flow.svg)
+
+## Estados do lead
+
+![Estados do lead](docs/assets/lead-lifecycle.svg)
+
+## Serviços e responsabilidades
+
+| Serviço | Porta | Responsabilidade |
+| --- | ---: | --- |
+| `anysale-ingestion-gateway` | 8083 | Recebe webhooks da Meta e mensagens normalizadas; valida assinatura, normaliza dados e encaminha ao core. |
+| `anysale-lead-service` | 8080 | Fonte de verdade dos leads, interações, funil, análise comercial e resposta sugerida. |
+| `anysale-catalog-service` | 8082 | Mantém o catálogo e calcula recomendações de produto. |
+| `anysale-notification-service` | 8081 | Envia mensagens WhatsApp e registra o histórico de notificações. |
+| `anysale-contracts` | — | Contratos de eventos Kafka compartilhados. |
+| `anysale-shared-kernel` | — | Value objects e utilitários Java sem dependência de Spring. |
+
+## Fluxo de eventos
+
+![Fluxo de eventos](docs/assets/event-flow.svg)
+
+- `lead.created`: produzido pelo Lead Service e consumido pelo Catalog Service.
+- `lead.updated`: produzido pelo Lead Service e consumido pelo Notification Service.
+
+## Infraestrutura local
+
+O Docker Compose sobe apenas a infraestrutura compartilhada:
+
+```bash
+docker compose -f infra/docker-compose.yml up -d
+```
+
+| Componente | Endereço local |
+| --- | --- |
+| PostgreSQL 16 | `localhost:5435` — banco/usuário `anysale`, senha `secret` |
+| MongoDB 6 | `localhost:27017` |
+| Kafka | `localhost:9092` |
+| n8n | [http://localhost:5678](http://localhost:5678) |
+
+## Executar o projeto
+
+Pré-requisitos: Java 17, Maven 3.9+, Docker e Docker Compose. Para desenvolvimento pela IDE, habilite o Lombok.
+
+```bash
+# 1. Subir infraestrutura
 docker compose -f infra/docker-compose.yml up -d
 
-Resumo dos serviços:
-Postgres 16 (localhost:5432, db/user/pass anysale / anysale / secret)
-Mongo 6 (localhost:27017, sem auth no dev)
-Kafka 7.6.x (localhost:9092, auto-create de tópicos habilitado no dev)
+# 2. Compilar e testar todos os módulos
+mvn clean package
 
-1) anysale-ingestion-gateway (WebFlux)
-Função: porta de entrada “universal” para receber leads brutos vindos de formulários, ads, parceiros etc.
-Trabalho principal: normaliza o payload (mapeia campos como full_name, desired_category, desired_tags…) e repassa para o lead-service via HTTP.
-Por que existe: desacopla integrações externas do core; aqui você coloca retries/circuit breakers (Resilience4j) e regras específicas de parceiros.
-Interface: POST /v1/ingest/lead.
-
-2) anysale-lead-service (Core/CRUD + eventos)
-Função: fonte de verdade dos Leads. Faz CRUD, regras de negócio e publica eventos.
-Dados que possui (Postgres): lead, lead_suggestion (e, no futuro, activity).
-Eventos Kafka:
-Produz: lead.created (quando cria) e lead.updated (mudanças de estágio, sugestões anexadas).
-Chamadas de entrada (REST):
-
-POST /v1/leads — cria lead (idempotência opcional).
-PATCH /v1/leads/{id}/stage — muda estágio (valida transições).
-PATCH /v1/leads/{id}/suggestions — anexa sugestões.
-GET /v1/leads/{id} — detalhe.
-Por que existe: concentra regra de negócio do funil e contratos de evento; 
-outros serviços não alteram lead direto no DB — pedem via API.
-
-3) anysale-catalog-service (Sugestões)
-Função: cuidar do catálogo de produtos (MongoDB) e gerar sugestões para um lead recém-criado.
-Fluxo:
-Consome lead.created.
-Calcula top 3 itens (regras/heurísticas) e chama PATCH /v1/leads/{id}/suggestions no lead-service.
-O lead-service anexa e então publica lead.updated.
-Chamadas de entrada (REST): POST /v1/products (seed/bulk), GET /v1/products.
-Por que existe: separar o domínio “catálogo & recomendação” do “funil de leads”;
-pode evoluir para IA sem tocar o core.
-
-4) anysale-notification-service (Notificações)
-Função: reagir às mudanças do lead e disparar/registrar notificações para o time (hoje: armazenado em memória; próximo passo: persistir).
-Fluxo:
-Consome lead.updated.
-Gera entradas de histórico e (futuramente) envia e-mail/SMS/WhatsApp, webhooks, etc.
-Chamadas de entrada (REST): GET /v1/notifications/{leadId} para consultar histórico.
-Por que existe: orquestração de follow-up e comunicação assíncrona, sem poluir o serviço de lead.
-
-5) anysale-contracts (Contratos compartilhados)
-Função: DTOs de evento e (se necessário) DTOs REST compartilhados.
-Conteúdo: LeadCreatedEvent, LeadUpdatedEvent (POJOs), com versão de evento.
-Por que existe: garantir compatibilidade entre produtores/consumidores (todos dependem deste módulo).
-
-6) anysale-shared-kernel (Kernel compartilhado)
-Função: utilidades e Value Objects (ex.: Email, Phone, Result, DomainException).
-Sem Spring, apenas Java puro.
-Por que existe: evitar duplicação de conceitos básicos de domínio em vários serviços.
-
-7) anysale-parent (Maven parent)
-Função: centraliza versões (Java 17, Spring Boot, plugins), e agrega os módulos com <modules>.
-Por que existe: padroniza build e simplifica manutenção de dependências.
-
-Build & Run
-# 0) infraestrutura
-docker compose -f infra/docker-compose.yml up -d
-# 1) build (raiz do repo)
-mvn -U -T 1C clean package
-# 2) subir serviços (cada um em um terminal ou pela IDE)
+# 3. Subir os serviços (um terminal por comando)
 mvn -f anysale-lead-service spring-boot:run
 mvn -f anysale-catalog-service spring-boot:run
 mvn -f anysale-notification-service spring-boot:run
 mvn -f anysale-ingestion-gateway spring-boot:run
+```
 
-# 3) health checks
+Health checks:
+
+```bash
 curl http://localhost:8080/actuator/health
 curl http://localhost:8081/actuator/health
 curl http://localhost:8082/actuator/health
 curl http://localhost:8083/actuator/health
+```
 
-Endpoints principais
+## Integração WhatsApp e n8n
 
-Lead Service (8080)
+### WhatsApp Cloud API
 
-POST /v1/leads
+Configure a Meta para chamar o Gateway:
 
-{
-"name":"João","email":"joao@ex.com","phone":"+55...",
-"source":"MarketplaceX","desiredCategory":"home-office",
-"desiredTags":["cadeira","ergonômica"]
-}
+```text
+GET/POST /v1/whatsapp/webhook
+```
 
+Variáveis necessárias para a integração real:
 
-PATCH /v1/leads/{id}/stage → {"stage":"WON"}
-PATCH /v1/leads/{id}/suggestions
+- `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
+- `WHATSAPP_APP_SECRET`
+- `WHATSAPP_ACCESS_TOKEN`
+- `WHATSAPP_PHONE_NUMBER_ID`
 
-{ "suggestions":[
-{"productId":"p1","title":"Cadeira Ergo A","price":520,"currency":"BRL","vendor":"LojaX"}
-]}
+Em produção, o webhook deve estar publicamente acessível em HTTPS e a assinatura `X-Hub-Signature-256` deve ser validada. Os campos `messages` e `statuses` precisam estar assinados na Meta.
 
+### n8n
 
-GET /v1/leads/{id}
-Catalog Service (8082)
-POST /v1/products (seed) · GET /v1/products
-Notification Service (8081)
-GET /v1/notifications/{leadId}
-Ingestion Gateway (8083)
-POST /v1/ingest/lead (payload bruto → normalizado e enviado ao Lead Service)
+O n8n pode testar ou ampliar automações usando o endpoint normalizado:
 
-Eventos (Kafka)
-lead.created — produzido pelo lead-service, consumido pelo catalog-service
-lead.updated — produzido pelo lead-service, consumido pelo notification-service
+```text
+POST http://localhost:8083/v1/messages/incoming
+```
 
-Contratos (módulo anysale-contracts)
-com.anysale.contracts.events.LeadCreatedEvent
-com.anysale.contracts.events.LeadUpdatedEvent
+Quando a variável `ANYSALE_INTERNAL_TOKEN` estiver configurada, envie também:
 
-Modelo de dados (Postgres)
-lead: id UUID PK, name, email, phone, source, desired_category, desired_tags TEXT[], stage, created_at, updated_at
-lead_suggestion: id, lead_id FK, product_id, title, price, currency, vendor, created_at
-Migrations via Flyway: anysale-lead-service/src/main/resources/db/migration/V1__init.sql
+```http
+X-Internal-Token: <token-compartilhado>
+```
 
-Troubleshooting
-Kafka deserialização (ClassNotFound)
-Garanta spring.kafka.*.trusted.packages=com.anysale.contracts.events em todos os consumidores e que os produtores enviem DTOs do módulo contracts.
-Se já houver mensagens antigas incompatíveis, troque o group-id ou limpe o tópico.
+O mesmo token deve ser usado no Gateway, Lead Service, Notification Service e n8n. Em ambiente local, sem a variável, a proteção fica desabilitada.
 
-Transaction synchronization is not active
-Use @org.springframework.transaction.annotation.Transactional (Spring) e publique eventos após o commit (ou adote Outbox).
+O contrato completo, exemplos de payload e endpoints estão em [docs/n8n-contract.md](docs/n8n-contract.md).
 
-Mongo/DB “connection refused”
-App em container deve usar mongo-anysale / pg-anysale (não localhost).
+## Endpoints principais
 
-Flyway checksum mismatch
-Não edite migrations aplicadas. 
-Crie uma nova V2__. Para ambiente local, flyway repair pode ser usado conscientemente.
-
-Roadmap curto
-Outbox para publicação idempotente
-Persistir notificações (Postgres)
-Autenticação/RBAC + multi-tenant
-Observabilidade (Prometheus/Grafana/OTel)
-Conectores (Facebook Lead Ads / Shopify / Woo)
-Appendix A — Criação de tópicos Kafka via Spring
-Crie esta classe no Lead Service para garantir os tópicos no start:
-anysale-lead-service/src/main/java/com/anysale/lead/config/KafkaTopicsConfig.java
+| Serviço | Endpoint | Finalidade |
+| --- | --- | --- |
+| Gateway | `POST /v1/whatsapp/webhook` | Recebe eventos da Meta. |
+| Gateway | `POST /v1/messages/incoming` | Recebe mensagem normalizada de n8n/integradores. |
+| Lead | `GET /v1/leads/{leadId}` | Consulta o lead, incluindo análise e `suggestedReply`. |
+| Lead | `GET /v1/leads/{leadId}/interactions` | Consulta a linha do tempo da conversa. |
+| Lead | `PATCH /v1/leads/{leadId}/enrichment` | Atualiza análise comercial externa, se necessária. |
+| Notification | `POST /v1/notifications/whatsapp/messages` | Envia texto WhatsApp informado pelo operador. |
+| Notification | `POST /v1/notifications/whatsapp/messages/suggested` | Envia a última resposta sugerida para o lead. |
+| Catalog | `POST /v1/products` | Inclui produtos no catálogo. |
+| Catalog | `GET /v1/products` | Lista produtos. |
+| Catalog | `GET /v1/catalog-integrations` | Lista integrações de catálogo externas do tenant (requer role `ADMIN`). |
+| Catalog | `POST /v1/catalog-integrations` | Cria nova integração de catálogo genérica REST. |
+| Catalog | `POST /v1/catalog-integrations/{id}/test` | Testa conexão com a API externa. |
+| Catalog | `POST /v1/catalog-integrations/{id}/preview` | Traz prévia dos dados normalizados sem persistir. |
+| Catalog | `POST /v1/catalog-integrations/{id}/sync` | Dispara sincronização manual de produtos em segundo plano. |
 
 
+A coleção de testes locais está em [postman/collections/AnySale (Local).postman_collection.json](<postman/collections/AnySale (Local).postman_collection.json>).
 
+## Dados persistidos
+
+No PostgreSQL, o Lead Service mantém:
+
+- dados de identificação e estágio do lead;
+- resumo, intenção, score, próxima ação, categoria e tags de interesse;
+- resposta sugerida e momento de geração;
+- interações de entrada e saída, inclusive identificador externo e status de entrega;
+- sugestões de produto.
+
+As migrations Flyway ficam em `anysale-lead-service/src/main/resources/db/migration`.
+
+## Próximas evoluções
+
+1. Implementar **outbox** para publicação idempotente dos eventos Kafka.
+2. Persistir o histórico de notificações em PostgreSQL.
+3. Substituir/expandir o assistente baseado em regras por um provedor de IA configurável.
+4. Adicionar autenticação de usuários, RBAC e multi-tenancy.
+5. Incluir observabilidade com Prometheus, Grafana e OpenTelemetry.
+6. Criar conectores para Facebook Lead Ads, Shopify, WooCommerce e outros canais.
+
+## Troubleshooting
+
+**Kafka falha ao desserializar eventos**
+
+Garanta `spring.kafka.*.trusted.packages=com.anysale.contracts.events` nos consumidores e use os DTOs de `anysale-contracts`. Para mensagens antigas incompatíveis, use outro `group-id` ou limpe o tópico de desenvolvimento.
+
+**Falha de conexão com banco em containers**
+
+Dentro de containers, use `pg-anysale` e `mongo-anysale`, não `localhost`.
+
+**Flyway checksum mismatch**
+
+Não altere migrations já aplicadas. Crie uma nova migration; em ambiente local, `flyway repair` pode ser usado conscientemente.

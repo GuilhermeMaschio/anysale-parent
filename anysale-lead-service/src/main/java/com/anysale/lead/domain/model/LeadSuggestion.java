@@ -17,6 +17,9 @@ public class LeadSuggestion {
     @JoinColumn(name = "lead_id")
     private Lead lead;
 
+    @Column(name = "tenant_id", nullable = false, updatable = false, length = 64)
+    private String tenantId;
+
     private String productId;
     private String title;
     private BigDecimal price;
@@ -34,6 +37,8 @@ public class LeadSuggestion {
     public void setId(UUID id) { this.id = id; }
     public Lead getLead() { return lead; }
     public void setLead(Lead lead) { this.lead = lead; }
+    public String getTenantId() { return tenantId; }
+    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
     public String getProductId() { return productId; }
     public void setProductId(String productId) { this.productId = productId; }
     public String getTitle() { return title; }

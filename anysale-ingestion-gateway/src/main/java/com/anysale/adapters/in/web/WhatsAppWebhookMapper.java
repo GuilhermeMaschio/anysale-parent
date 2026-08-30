@@ -2,9 +2,11 @@ package com.anysale.adapters.in.web;
 
 import com.anysale.adapters.in.web.dto.IncomingMessageRequest;
 import com.anysale.adapters.in.web.dto.WhatsAppWebhookPayload;
+import com.anysale.application.model.MessageStatusUpdate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -30,6 +32,21 @@ public class WhatsAppWebhookMapper {
                 .toList();
     }
 
+    public List<MessageStatusUpdate> toStatusUpdates(WhatsAppWebhookPayload payload) {
+        if (payload == null) {
+            return List.of();
+        }
+
+        return stream(payload.entry())
+                .flatMap(entry -> stream(entry.changes()))
+                .map(WhatsAppWebhookPayload.Change::value)
+                .filter(Objects::nonNull)
+                .flatMap(value -> stream(value.statuses()))
+                .filter(this::isSupportedStatusUpdate)
+                .map(this::toStatusUpdate)
+                .toList();
+    }
+
     private List<IncomingMessageRequest> toIncomingRequests(WhatsAppWebhookPayload.Value value) {
         Map<String, String> contactNamesByWaId = contactNamesByWaId(value.contacts());
 
@@ -43,6 +60,21 @@ public class WhatsAppWebhookMapper {
                         message.id()
                 ))
                 .toList();
+    }
+
+    private MessageStatusUpdate toStatusUpdate(WhatsAppWebhookPayload.Status status) {
+        WhatsAppWebhookPayload.Error firstError = first(status.errors());
+
+        return new MessageStatusUpdate(
+                CHANNEL,
+                status.id(),
+                status.status(),
+                parseTimestamp(status.timestamp()),
+                trimToNull(status.recipientId()),
+                firstError == null || firstError.code() == null ? null : String.valueOf(firstError.code()),
+                firstError == null ? null : trimToNull(firstError.title()),
+                firstError == null ? null : trimToNull(firstError.message())
+        );
     }
 
     private Map<String, String> contactNamesByWaId(List<WhatsAppWebhookPayload.Contact> contacts) {
@@ -69,6 +101,35 @@ public class WhatsAppWebhookMapper {
                 && StringUtils.hasText(message.from())
                 && message.text() != null
                 && StringUtils.hasText(message.text().body());
+    }
+
+    private boolean isSupportedStatusUpdate(WhatsAppWebhookPayload.Status status) {
+        return status != null
+                && StringUtils.hasText(status.id())
+                && StringUtils.hasText(status.status());
+    }
+
+    private Instant parseTimestamp(String timestamp) {
+        if (!StringUtils.hasText(timestamp)) {
+            return null;
+        }
+
+        try {
+            return Instant.ofEpochSecond(Long.parseLong(timestamp));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private String trimToNull(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private static <T> T first(List<T> values) {
+        return values == null || values.isEmpty() ? null : values.get(0);
     }
 
     private static <T> Stream<T> stream(List<T> values) {

@@ -3,6 +3,8 @@ package com.anysale.lead.adapters.in.rest.command;
 import com.anysale.lead.aplication.usecase.HandleIncomingMessageUseCase;
 import com.anysale.lead.adapters.in.rest.dto.LeadResponseDto;
 import com.anysale.lead.idempotency.IdempotencyService;
+import com.anysale.lead.config.LocalSecurityConfig;
+import org.springframework.context.annotation.Import;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -17,8 +19,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = LeadInboundController.class)
+@WebMvcTest(controllers = LeadInboundController.class, properties = "internal.auth.token=test-token")
+@Import(LocalSecurityConfig.class)
 class LeadInboundControllerTest {
+    private static final String INTERNAL_TOKEN = "test-token";
 
     @Autowired
     private MockMvc mockMvc;
@@ -41,6 +45,7 @@ class LeadInboundControllerTest {
                         .build());
 
         mockMvc.perform(post("/v1/leads/incoming-message")
+                        .header("X-Internal-Token", INTERNAL_TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -56,5 +61,21 @@ class LeadInboundControllerTest {
                 .andExpect(jsonPath("$.stage").value("CONTACTED"));
 
         verify(handleIncomingMessageUseCase).execute(any());
+    }
+
+    @Test
+    void rejectsRequestWithoutInternalToken() throws Exception {
+        mockMvc.perform(post("/v1/leads/incoming-message")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "phone": "41999999999",
+                                  "leadName": "Guilherme",
+                                  "message": "Quero saber mais",
+                                  "channel": "WHATSAPP",
+                                  "externalMessageId": "msg-1"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
     }
 }

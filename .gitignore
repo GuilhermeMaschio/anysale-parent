@@ -36,3 +36,9 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### Local runtime ###
+.codex-tmp/
+infra/staging/*.env
+infra/staging/**/*.env
+*.local.env

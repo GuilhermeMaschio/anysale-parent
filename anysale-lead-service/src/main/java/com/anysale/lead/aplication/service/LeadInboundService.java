@@ -9,6 +9,7 @@ import com.anysale.lead.adapters.out.persistence.LeadJpaRepository;
 import com.anysale.lead.aplication.usecase.HandleIncomingMessageUseCase;
 import com.anysale.lead.domain.model.Interaction;
 import com.anysale.lead.domain.model.Lead;
+import com.anysale.lead.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,8 @@ public class LeadInboundService implements HandleIncomingMessageUseCase {
     private final LeadJpaRepository leadRepository;
     private final InteractionJpaRepository interactionRepository;
     private final LeadEventPublisher leadEventPublisher;
+    private final LeadAiService leadAiService;
+    private final TenantContext tenantContext;
 
     @Override
     @Transactional
@@ -47,6 +50,7 @@ public class LeadInboundService implements HandleIncomingMessageUseCase {
 
         Interaction interaction = new Interaction();
         interaction.setLead(leadResolution.lead());
+        interaction.setTenantId(leadResolution.lead().getTenantId());
         interaction.setMessage(request.message().trim());
         interaction.setChannel(normalizedChannel);
         interaction.setDirection(INBOUND_DIRECTION);
@@ -63,13 +67,14 @@ public class LeadInboundService implements HandleIncomingMessageUseCase {
             throw ex;
         }
 
-        if (leadResolution.created()) {
-            leadEventPublisher.publishLeadCreated(leadResolution.lead());
-        }
-        leadEventPublisher.publishLeadUpdated(leadResolution.lead(), "INCOMING_MESSAGE_RECEIVED");
+        Lead enrichedLead = leadAiService.enrichLeadFromConversation(leadResolution.lead().getId());
 
-        // TODO plug AI classification/scoring/auto-response from this flow.
-        return LeadMapper.toResponse(leadResolution.lead());
+        if (leadResolution.created()) {
+            leadEventPublisher.publishLeadCreated(enrichedLead);
+        }
+        leadEventPublisher.publishLeadUpdated(enrichedLead, "INCOMING_MESSAGE_RECEIVED");
+
+        return LeadMapper.toResponse(enrichedLead);
     }
 
     private LeadResolution resolveLead(IncomingMessageRequest request, String normalizedPhone, String normalizedChannel) {
@@ -82,6 +87,7 @@ public class LeadInboundService implements HandleIncomingMessageUseCase {
             lead.setPhone(normalizedPhone);
             lead.setName(fallbackLeadName);
             lead.setSource(normalizedChannel);
+            lead.setTenantId(tenantContext.tenantId());
             created = true;
         } else {
             lead.setPhone(normalizedPhone);
@@ -149,6 +155,9 @@ public class LeadInboundService implements HandleIncomingMessageUseCase {
     private LeadResponseDto findExistingLeadResponse(String normalizedChannel, String externalMessageId) {
         return interactionRepository.findByChannelAndExternalMessageId(normalizedChannel, externalMessageId)
                 .map(Interaction::getLead)
+                .filter(lead -> lead != null && lead.getId() != null)
+                .map(Lead::getId)
+                .flatMap(leadRepository::findByIdWithTags)
                 .map(LeadMapper::toResponse)
                 .orElse(null);
     }

@@ -28,7 +28,8 @@ public record WhatsAppWebhookPayload(
     public record Value(
             Metadata metadata,
             List<Contact> contacts,
-            List<Message> messages
+            List<Message> messages,
+            List<Status> statuses
     ) {
     }
 
@@ -65,6 +66,24 @@ public record WhatsAppWebhookPayload(
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Text(
             String body
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Status(
+            String id,
+            @JsonProperty("recipient_id") String recipientId,
+            String status,
+            String timestamp,
+            List<Error> errors
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Error(
+            Integer code,
+            String title,
+            String message
     ) {
     }
 }

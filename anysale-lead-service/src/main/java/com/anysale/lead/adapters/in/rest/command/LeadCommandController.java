@@ -3,10 +3,15 @@ package com.anysale.lead.adapters.in.rest.command;
 import com.anysale.lead.adapters.in.rest.dto.*;
 import com.anysale.lead.adapters.in.rest.maper.LeadMapper;
 import com.anysale.lead.aplication.LeadService; // seu service atual
+import com.anysale.lead.aplication.LeadWhatsAppService;
+import com.anysale.lead.aplication.service.LeadAiService;
+import com.anysale.lead.aplication.ai.OpenAiLeadAiAssistant;
 import com.anysale.lead.domain.model.Lead;
+import com.anysale.lead.internalauth.InternalTokenProtected;
 import com.anysale.lead.idempotency.Idempotent;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -18,7 +23,16 @@ import java.util.UUID;
 public class LeadCommandController {
 
     private final LeadService service;
-    public LeadCommandController(LeadService service) { this.service = service; }
+    private final LeadAiService leadAiService;
+    private final LeadWhatsAppService leadWhatsAppService;
+    private final OpenAiLeadAiAssistant openAiLeadAiAssistant;
+
+    public LeadCommandController(LeadService service, LeadAiService leadAiService, LeadWhatsAppService leadWhatsAppService, OpenAiLeadAiAssistant openAiLeadAiAssistant) {
+        this.service = service;
+        this.leadAiService = leadAiService;
+        this.leadWhatsAppService = leadWhatsAppService;
+        this.openAiLeadAiAssistant = openAiLeadAiAssistant;
+    }
 
     /**
      * Idempotente via header Idempotency-Key (ver Interceptor/Advice).
@@ -54,7 +68,7 @@ public class LeadCommandController {
     public ResponseEntity<StageChangedResponseDto> changeStage(
             @PathVariable UUID id, @Valid @RequestBody StageRequestDto req) {
 
-        StageChangedResponseDto body = service.changeStageAndReturnDto(id, req.getStage());
+        StageChangedResponseDto body = service.changeStageAndReturnDto(id, req.getStage(), req.getChangedBy(), req.getReason(), req.getActualValue(), req.getLostReason());
 
         var self = ServletUriComponentsBuilder
                 .fromCurrentRequestUri()
@@ -68,6 +82,12 @@ public class LeadCommandController {
                 .location(self)          // aponta para o recurso completo
                 .eTag(etag)              // ajuda em cache/condicionais
                 .body(body);
+    }
+
+    @PatchMapping("/{id}/commercial")
+    public ResponseEntity<LeadResponseDto> updateCommercial(@PathVariable UUID id, @Valid @RequestBody CommercialUpdateRequestDto body) {
+        Lead saved = service.updateCommercial(id, body);
+        return ResponseEntity.ok().eTag("\"" + saved.getUpdatedAt().toEpochMilli() + "\"").body(LeadMapper.toResponse(saved));
     }
 
     @Idempotent(operation = "LEAD_SUGGESTIONS_PATCH", resourceIdParam = "id", ttlSeconds = 86400)
@@ -84,6 +104,7 @@ public class LeadCommandController {
     }
 
     @PatchMapping("/{id}/enrichment")
+    @InternalTokenProtected
     public ResponseEntity<LeadResponseDto> enrich(
             @PathVariable UUID id,
             @Valid @RequestBody LeadEnrichmentRequestDto body) {
@@ -95,5 +116,48 @@ public class LeadCommandController {
                 .location(URI.create("/v1/leads/" + id))
                 .eTag("\"" + saved.getUpdatedAt().toEpochMilli() + "\"")
                 .body(response);
+    }
+
+    @PostMapping("/{id}/ai-enrichment")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<LeadResponseDto> regenerateAiEnrichment(@PathVariable UUID id) {
+        Lead saved = leadAiService.enrichLeadFromConversation(id);
+        LeadResponseDto response = LeadMapper.toResponse(saved);
+        response.setAiProviderStatus(openAiLeadAiAssistant.lastAttemptStatus());
+
+        return ResponseEntity.ok()
+                .location(URI.create("/v1/leads/" + id))
+                .eTag("\"" + saved.getUpdatedAt().toEpochMilli() + "\"")
+                .body(response);
+    }
+
+    @PostMapping("/{id}/interactions/outbound")
+    @InternalTokenProtected
+    public ResponseEntity<InteractionResponseDto> recordOutboundInteraction(
+            @PathVariable UUID id,
+            @Valid @RequestBody OutboundInteractionRequest body) {
+
+        InteractionResponseDto response = LeadMapper.toInteractionResponse(
+                service.recordOutboundInteraction(id, body)
+        );
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/whatsapp/messages")
+    public ResponseEntity<SendLeadWhatsAppMessageResponse> sendWhatsAppMessage(
+            @PathVariable UUID id,
+            @Valid @RequestBody SendLeadWhatsAppMessageRequest body
+    ) {
+        return ResponseEntity.ok(leadWhatsAppService.send(id, body));
+    }
+
+    @PostMapping("/interactions/status")
+    @InternalTokenProtected
+    public ResponseEntity<Void> updateInteractionStatus(
+            @Valid @RequestBody InteractionStatusUpdateRequest body) {
+
+        service.updateInteractionStatus(body);
+        return ResponseEntity.noContent().build();
     }
 }

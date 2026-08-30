@@ -1,0 +1,47 @@
+:root { color-scheme: light; }
+html, body, #keycloak-bg { min-height: 100%; }
+body#keycloak-bg {
+  min-height: 100vh;
+  margin: 0;
+  background: linear-gradient(135deg, #edf4ff, #f7fbff 45%, #eef9f4) !important;
+  color: #1d2d47;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.pf-v5-c-login { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+.pf-v5-c-login__container { width: min(100%, 420px); padding: 0 !important; display: block; }
+#kc-header { margin: 0 0 14px; }
+#kc-header-wrapper {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  color: #1d2d47; font-size: 22px; font-weight: 800; letter-spacing: -.04em; text-transform: lowercase;
+}
+#kc-header-wrapper::before {
+  content: "a"; display: grid; place-items: center; width: 31px; height: 31px;
+  border-radius: 9px; background: #2875e8; color: #fff; font-family: Georgia, serif; font-size: 25px; line-height: 1;
+}
+#kc-header-wrapper::after { content: "console"; color: #6a7b94; font-size: 12px; font-weight: 700; letter-spacing: 0; }
+.pf-v5-c-login__main {
+  overflow: hidden; border: 1px solid #dce5f1; border-radius: 18px;
+  background: rgba(255,255,255,.98); box-shadow: 0 20px 55px rgba(25,51,90,.12);
+}
+.pf-v5-c-login__main-header { padding: 42px 42px 0; }
+.pf-v5-c-login__main-body { padding: 0 42px 42px; }
+.pf-v5-c-login__main-footer { display: none; }
+.pf-v5-c-login__main-header .pf-v5-c-title, #kc-page-title { margin: 0; color: #1d2d47; font-size: 29px; font-weight: 800; letter-spacing: -.045em; }
+.anysale-login-intro { margin: 12px 0 28px; color: #718097; font-size: 14px; line-height: 1.55; }
+.pf-v5-c-form { display: grid; gap: 17px; }
+.pf-v5-c-form__group { margin: 0 !important; }
+.pf-v5-c-form__label { margin-bottom: 6px; color: #3d4b60; font-size: 12px; font-weight: 750; }
+.pf-v5-c-form-control { border-color: #d6e0ed; border-radius: 8px; background: #fff; }
+.pf-v5-c-form-control input { min-height: 42px; border-radius: 8px; color: #1d2d47; font: inherit; }
+.pf-v5-c-form-control:focus-within { border-color: #6a9bf0; box-shadow: 0 0 0 3px #e9f1ff; }
+#kc-login { min-height: 44px; margin-top: 4px; border: 0; border-radius: 9px; background: #2875e8; box-shadow: 0 6px 16px rgba(40,117,232,.24); color: #fff; font: inherit; font-size: 14px; font-weight: 800; }
+#kc-login:hover { background: #1968da; }
+.pf-v5-c-helper-text { margin-top: 6px; font-size: 12px; }
+@media (max-width: 640px) {
+  .pf-v5-c-login { padding: 18px; align-items: start; }
+  .pf-v5-c-login__container { width: 100%; margin-top: max(28px, 8vh); }
+  .pf-v5-c-login__main { border-radius: 14px; }
+  .pf-v5-c-login__main-header { padding: 30px 25px 0; }
+  .pf-v5-c-login__main-body { padding: 0 25px 30px; }
+  .pf-v5-c-login__main-header .pf-v5-c-title, #kc-page-title { font-size: 26px; }
+}

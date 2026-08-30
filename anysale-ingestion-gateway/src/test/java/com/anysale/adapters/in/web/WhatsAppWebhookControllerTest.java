@@ -2,6 +2,8 @@ package com.anysale.adapters.in.web;
 
 import com.anysale.adapters.in.web.dto.IncomingMessageRequest;
 import com.anysale.adapters.in.web.dto.IncomingMessageResponse;
+import com.anysale.application.model.MessageStatusUpdate;
+import com.anysale.application.port.out.LeadGatewayPort;
 import com.anysale.application.usecase.ReceiveIncomingMessageUseCase;
 import com.anysale.gateway.IngestionGatewayApplication;
 import org.junit.jupiter.api.Test;
@@ -42,6 +44,9 @@ class WhatsAppWebhookControllerTest {
 
     @MockBean
     private ReceiveIncomingMessageUseCase receiveIncomingMessageUseCase;
+
+    @MockBean
+    private LeadGatewayPort leadGatewayPort;
 
     @Test
     void verifiesMetaWebhookChallenge() {
@@ -106,6 +111,31 @@ class WhatsAppWebhookControllerTest {
         verifyNoInteractions(receiveIncomingMessageUseCase);
     }
 
+    @Test
+    void receivesSignedMetaStatusPayload() throws Exception {
+        String body = statusPayload();
+        when(leadGatewayPort.updateInteractionStatus(any(MessageStatusUpdate.class))).thenReturn(Mono.empty());
+
+        webTestClient.post()
+                .uri("/v1/whatsapp/webhook")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("X-Hub-Signature-256", signature(body, "test-secret"))
+                .bodyValue(body)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody().isEmpty();
+
+        ArgumentCaptor<MessageStatusUpdate> statusCaptor = ArgumentCaptor.forClass(MessageStatusUpdate.class);
+        verify(leadGatewayPort).updateInteractionStatus(statusCaptor.capture());
+        verifyNoInteractions(receiveIncomingMessageUseCase);
+
+        MessageStatusUpdate statusUpdate = statusCaptor.getValue();
+        assertThat(statusUpdate.channel()).isEqualTo("WHATSAPP");
+        assertThat(statusUpdate.externalMessageId()).isEqualTo("wamid.status");
+        assertThat(statusUpdate.status()).isEqualTo("delivered");
+        assertThat(statusUpdate.recipientId()).isEqualTo("5541999999999");
+    }
+
     private IncomingMessageResponse response() {
         return new IncomingMessageResponse(
                 "RECEIVED",
@@ -154,6 +184,39 @@ class WhatsAppWebhookControllerTest {
                                   "body": "Quero saber mais sobre cadeira ergonomica"
                                 },
                                 "type": "text"
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+                """;
+    }
+
+    private String statusPayload() {
+        return """
+                {
+                  "object": "whatsapp_business_account",
+                  "entry": [
+                    {
+                      "id": "123456789",
+                      "changes": [
+                        {
+                          "field": "messages",
+                          "value": {
+                            "messaging_product": "whatsapp",
+                            "metadata": {
+                              "display_phone_number": "55 41 99999-9999",
+                              "phone_number_id": "987654321"
+                            },
+                            "statuses": [
+                              {
+                                "id": "wamid.status",
+                                "status": "delivered",
+                                "timestamp": "1713575580",
+                                "recipient_id": "5541999999999"
                               }
                             ]
                           }
