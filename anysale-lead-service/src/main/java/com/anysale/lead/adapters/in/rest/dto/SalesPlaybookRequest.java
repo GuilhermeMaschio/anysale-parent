@@ -1,0 +1,1 @@
+package com.anysale.lead.adapters.in.rest.dto; import jakarta.validation.constraints.*; import java.util.*; public record SalesPlaybookRequest(@NotBlank @Size(max=120) String name,@Size(max=500) String description,boolean active,boolean defaultPlaybook,Set<@NotBlank @Size(max=80) String> categories) {}

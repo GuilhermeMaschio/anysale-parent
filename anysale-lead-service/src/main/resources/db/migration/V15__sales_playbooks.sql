@@ -1,0 +1,3 @@
+CREATE TABLE sales_playbook (id UUID PRIMARY KEY, tenant_id VARCHAR(64) NOT NULL REFERENCES tenant(id), name VARCHAR(120) NOT NULL, description VARCHAR(500), active BOOLEAN NOT NULL DEFAULT TRUE, is_default BOOLEAN NOT NULL DEFAULT FALSE, version INTEGER NOT NULL DEFAULT 1, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE UNIQUE INDEX uk_sales_playbook_default ON sales_playbook(tenant_id) WHERE is_default;
+CREATE TABLE sales_playbook_category (playbook_id UUID NOT NULL REFERENCES sales_playbook(id) ON DELETE CASCADE, category VARCHAR(80) NOT NULL, PRIMARY KEY(playbook_id, category));

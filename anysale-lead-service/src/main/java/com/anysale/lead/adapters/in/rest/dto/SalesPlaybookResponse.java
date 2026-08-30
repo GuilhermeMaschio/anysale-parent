@@ -1,0 +1,1 @@
+package com.anysale.lead.adapters.in.rest.dto; import java.util.*; public record SalesPlaybookResponse(UUID id,String name,String description,boolean active,boolean defaultPlaybook,int version,Set<String> categories) {}
