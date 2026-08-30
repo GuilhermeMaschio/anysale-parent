@@ -7,6 +7,7 @@ import com.anysale.lead.adapters.out.messaging.LeadEventPublisher;
 import com.anysale.lead.adapters.out.persistence.InteractionJpaRepository;
 import com.anysale.lead.adapters.out.persistence.LeadJpaRepository;
 import com.anysale.lead.aplication.usecase.HandleIncomingMessageUseCase;
+import com.anysale.lead.aplication.LeadCadenceService;
 import com.anysale.lead.domain.model.Interaction;
 import com.anysale.lead.domain.model.Lead;
 import com.anysale.lead.tenant.TenantContext;
@@ -30,6 +31,7 @@ public class LeadInboundService implements HandleIncomingMessageUseCase {
     private final InteractionJpaRepository interactionRepository;
     private final LeadEventPublisher leadEventPublisher;
     private final LeadAiService leadAiService;
+    private final LeadCadenceService leadCadenceService;
     private final TenantContext tenantContext;
 
     @Override
@@ -68,6 +70,7 @@ public class LeadInboundService implements HandleIncomingMessageUseCase {
         }
 
         Lead enrichedLead = leadAiService.enrichLeadFromConversation(leadResolution.lead().getId());
+        leadCadenceService.pauseForInboundResponse(enrichedLead);
 
         if (leadResolution.created()) {
             leadEventPublisher.publishLeadCreated(enrichedLead);
