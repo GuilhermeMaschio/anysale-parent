@@ -5,6 +5,7 @@ import com.anysale.lead.adapters.in.rest.dto.ManagedUserResponse;
 import com.anysale.lead.adapters.in.rest.dto.ManagedUserUpdateRequest;
 import com.anysale.lead.config.KeycloakAdminProperties;
 import com.anysale.lead.tenant.TenantContext;
+import com.anysale.lead.tenant.UserIdentityContext;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -31,11 +32,14 @@ public class KeycloakUserManagementService {
     private static final List<String> ROLE_ORDER = List.of("ADMIN", "SALES_MANAGER", "SALES_AGENT");
     private final KeycloakAdminProperties properties;
     private final TenantContext tenantContext;
+    private final UserIdentityContext userIdentityContext;
     private final RestClient client = RestClient.create();
 
-    public KeycloakUserManagementService(KeycloakAdminProperties properties, TenantContext tenantContext) {
+    public KeycloakUserManagementService(KeycloakAdminProperties properties, TenantContext tenantContext,
+                                         UserIdentityContext userIdentityContext) {
         this.properties = properties;
         this.tenantContext = tenantContext;
+        this.userIdentityContext = userIdentityContext;
     }
 
     public List<ManagedUserResponse> list(String search) {
@@ -92,6 +96,16 @@ public class KeycloakUserManagementService {
                 )).retrieve().toBodilessEntity());
         replaceRole(id, request.role());
         return find(id, tenantId);
+    }
+
+    public void delete(String id) {
+        ensureConfigured();
+        if (id.equals(userIdentityContext.userId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Você não pode excluir a própria conta.");
+        }
+        find(id, tenantContext.tenantId());
+        request(() -> client.delete().uri(adminBase() + "/users/{id}", id).headers(this::authorization)
+                .retrieve().toBodilessEntity());
     }
 
     private ManagedUserResponse find(String id, String tenantId) {

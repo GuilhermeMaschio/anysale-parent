@@ -31,4 +31,10 @@ public class UserManagementController {
     public ManagedUserResponse update(@PathVariable String id, @Valid @RequestBody ManagedUserUpdateRequest request) {
         return service.update(id, request);
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable String id) {
+        service.delete(id);
+        return ResponseEntity.noContent().build();
+    }
 }
