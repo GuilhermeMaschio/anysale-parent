@@ -3,6 +3,7 @@ package com.anysale.lead.adapters.in.rest.command;
 import com.anysale.lead.adapters.in.rest.dto.CadenceStepRequest;
 import com.anysale.lead.adapters.in.rest.dto.CadenceStepResponse;
 import com.anysale.lead.adapters.in.rest.dto.LeadCadenceResponse;
+import com.anysale.lead.adapters.in.rest.dto.LeadCadenceRoadmapResponse;
 import com.anysale.lead.aplication.LeadCadenceService;
 import com.anysale.lead.domain.model.LeadCadence;
 import com.anysale.lead.domain.model.SalesPlaybookStep;
@@ -56,6 +57,13 @@ public class LeadCadenceController {
 
     @GetMapping("/leads/{leadId}/cadence")
     public LeadCadenceResponse get(@PathVariable UUID leadId) { return cadence(service.get(leadId)); }
+
+    @GetMapping("/leads/{leadId}/cadence/roadmap")
+    public LeadCadenceRoadmapResponse roadmap(@PathVariable UUID leadId) {
+        LeadCadence cadence = service.get(leadId);
+        return new LeadCadenceRoadmapResponse(cadence(cadence),
+                service.steps(cadence.getPlaybook().getId()).stream().map(LeadCadenceController::step).toList());
+    }
 
     private static CadenceStepResponse step(SalesPlaybookStep source) {
         return new CadenceStepResponse(source.getId(), source.getPosition(), source.getDelayMinutes(), source.getTitle(),
