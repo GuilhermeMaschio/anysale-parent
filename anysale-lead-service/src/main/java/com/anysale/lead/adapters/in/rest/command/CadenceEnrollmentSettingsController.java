@@ -5,8 +5,10 @@ import com.anysale.lead.domain.model.CadenceEnrollmentSettings;
 import com.anysale.lead.tenant.TenantContext;
 import java.time.Instant;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @RestController @RequestMapping("/v1/cadence-enrollment-settings")
+@PreAuthorize("hasAnyRole('ADMIN', 'SALES_MANAGER')")
 public class CadenceEnrollmentSettingsController {
     private final CadenceEnrollmentService service; private final TenantContext tenants;
     public CadenceEnrollmentSettingsController(CadenceEnrollmentService service, TenantContext tenants) { this.service=service; this.tenants=tenants; }
