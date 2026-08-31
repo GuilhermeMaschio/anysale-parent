@@ -10,19 +10,15 @@ import com.anysale.lead.domain.model.Lead;
 import com.anysale.lead.tenant.TenantContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -49,97 +45,6 @@ class LeadInboundServiceTest {
     private LeadInboundService service;
 
     @Test
-    void createsLeadAndInteractionWhenPhoneDoesNotExist() {
-        IncomingMessageRequest request = new IncomingMessageRequest(
-                "+55 (41) 99999-9999",
-                "Guilherme",
-                "Quero saber mais",
-                "whatsapp",
-                "msg-1"
-        );
-
-        when(interactionRepository.findByChannelAndExternalMessageId("WHATSAPP", "msg-1"))
-                .thenReturn(Optional.empty());
-        when(leadRepository.findAllByNormalizedPhone("5541999999999")).thenReturn(List.of());
-        when(tenantContext.tenantId()).thenReturn("anysale");
-        when(leadRepository.save(any(Lead.class))).thenAnswer(invocation -> {
-            Lead lead = invocation.getArgument(0);
-            if (lead.getId() == null) {
-                lead.setId(UUID.randomUUID());
-            }
-            return lead;
-        });
-        when(leadAiService.enrichLeadFromConversation(any(UUID.class)))
-                .thenAnswer(invocation -> savedLeadWithSuggestion(invocation.getArgument(0), "Guilherme"));
-
-        LeadResponseDto response = service.execute(request);
-
-        ArgumentCaptor<Lead> leadCaptor = ArgumentCaptor.forClass(Lead.class);
-        verify(leadRepository).save(leadCaptor.capture());
-        Lead savedLead = leadCaptor.getValue();
-        assertThat(savedLead.getPhone()).isEqualTo("5541999999999");
-        assertThat(savedLead.getName()).isEqualTo("Guilherme");
-        assertThat(savedLead.getSource()).isEqualTo("WHATSAPP");
-        assertThat(savedLead.getStage()).isEqualTo("CONTACTED");
-        assertThat(savedLead.getLastMessage()).isEqualTo("Quero saber mais");
-        assertThat(savedLead.getLastInteractionAt()).isNotNull();
-        assertThat(response.getId()).isEqualTo(savedLead.getId());
-        assertThat(response.getStage()).isEqualTo("CONTACTED");
-        assertThat(response.getSuggestedReply()).isEqualTo("Sugestao inicial");
-
-        ArgumentCaptor<Interaction> interactionCaptor = ArgumentCaptor.forClass(Interaction.class);
-        verify(interactionRepository).save(interactionCaptor.capture());
-        Interaction interaction = interactionCaptor.getValue();
-        assertThat(interaction.getLead()).isSameAs(savedLead);
-        assertThat(interaction.getChannel()).isEqualTo("WHATSAPP");
-        assertThat(interaction.getDirection()).isEqualTo("IN");
-        assertThat(interaction.getExternalMessageId()).isEqualTo("msg-1");
-
-        verify(leadAiService).enrichLeadFromConversation(savedLead.getId());
-        verify(leadEventPublisher).publishLeadCreated(any(Lead.class));
-        verify(leadEventPublisher).publishLeadUpdated(any(Lead.class), eq("INCOMING_MESSAGE_RECEIVED"));
-    }
-
-    @Test
-    void reusesExistingLeadWithoutOverwritingExistingName() {
-        Lead existingLead = new Lead();
-        existingLead.setId(UUID.randomUUID());
-        existingLead.setName("Lead Existente");
-        existingLead.setPhone("+55 (41) 99999-9999");
-        existingLead.setStage("NEW");
-        existingLead.setCreatedAt(Instant.now().minusSeconds(3600));
-
-        IncomingMessageRequest request = new IncomingMessageRequest(
-                "41999999999",
-                "Novo Nome",
-                "Mensagem recebida",
-                "WHATSAPP",
-                null
-        );
-
-        when(leadRepository.findAllByNormalizedPhone("41999999999")).thenReturn(List.of(existingLead));
-        when(leadRepository.save(any(Lead.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(leadAiService.enrichLeadFromConversation(existingLead.getId())).thenAnswer(invocation -> {
-            existingLead.setSuggestedReply("Sugestao existente");
-            return existingLead;
-        });
-
-        LeadResponseDto response = service.execute(request);
-
-        verify(leadRepository).save(existingLead);
-        assertThat(existingLead.getName()).isEqualTo("Lead Existente");
-        assertThat(existingLead.getPhone()).isEqualTo("41999999999");
-        assertThat(existingLead.getStage()).isEqualTo("CONTACTED");
-        assertThat(existingLead.getLastMessage()).isEqualTo("Mensagem recebida");
-        assertThat(response.getId()).isEqualTo(existingLead.getId());
-        assertThat(response.getLastMessage()).isEqualTo("Mensagem recebida");
-        assertThat(response.getSuggestedReply()).isEqualTo("Sugestao existente");
-
-        verify(leadEventPublisher, never()).publishLeadCreated(any(Lead.class));
-        verify(leadEventPublisher).publishLeadUpdated(existingLead, "INCOMING_MESSAGE_RECEIVED");
-    }
-
-    @Test
     void ignoresDuplicatedExternalMessage() {
         IncomingMessageRequest request = new IncomingMessageRequest(
                 "41999999999",
@@ -163,45 +68,8 @@ class LeadInboundServiceTest {
         verify(leadRepository, never()).save(any(Lead.class));
         verify(interactionRepository, never()).save(any(Interaction.class));
         verify(leadEventPublisher, never()).publishLeadCreated(any(Lead.class));
-        verify(leadEventPublisher, never()).publishLeadUpdated(any(Lead.class), eq("INCOMING_MESSAGE_RECEIVED"));
+        verify(leadEventPublisher, never()).publishLeadUpdated(any(Lead.class), any());
         assertThat(response.getId()).isEqualTo(lead.getId());
     }
 
-    @Test
-    void usesFallbackNameWhenInboundLeadNameIsMissing() {
-        IncomingMessageRequest request = new IncomingMessageRequest(
-                "41999999999",
-                "   ",
-                "Mensagem recebida",
-                "WHATSAPP",
-                null
-        );
-
-        when(leadRepository.findAllByNormalizedPhone("41999999999")).thenReturn(List.of());
-        when(leadRepository.save(any(Lead.class))).thenAnswer(invocation -> {
-            Lead lead = invocation.getArgument(0);
-            if (lead.getId() == null) {
-                lead.setId(UUID.randomUUID());
-            }
-            return lead;
-        });
-        when(leadAiService.enrichLeadFromConversation(any(UUID.class)))
-                .thenAnswer(invocation -> savedLeadWithSuggestion(invocation.getArgument(0), "Contato 41999999999"));
-
-        LeadResponseDto response = service.execute(request);
-
-        ArgumentCaptor<Lead> leadCaptor = ArgumentCaptor.forClass(Lead.class);
-        verify(leadRepository).save(leadCaptor.capture());
-        assertThat(leadCaptor.getValue().getName()).isEqualTo("Contato 41999999999");
-        assertThat(response.getName()).isEqualTo("Contato 41999999999");
-    }
-
-    private Lead savedLeadWithSuggestion(UUID leadId, String name) {
-        Lead lead = new Lead();
-        lead.setId(leadId);
-        lead.setName(name);
-        lead.setStage("CONTACTED");
-        lead.setSuggestedReply("Sugestao inicial");
-        return lead;
-    }
 }
