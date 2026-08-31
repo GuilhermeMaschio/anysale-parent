@@ -5,6 +5,7 @@ import com.anysale.lead.adapters.in.rest.dto.ManagedUserResponse;
 import com.anysale.lead.adapters.in.rest.dto.ManagedUserUpdateRequest;
 import com.anysale.lead.config.KeycloakAdminProperties;
 import com.anysale.lead.tenant.TenantContext;
+import com.anysale.lead.tenant.UserIdentityContext;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -31,11 +32,14 @@ public class KeycloakUserManagementService {
     private static final List<String> ROLE_ORDER = List.of("ADMIN", "SALES_MANAGER", "SALES_AGENT");
     private final KeycloakAdminProperties properties;
     private final TenantContext tenantContext;
+    private final UserIdentityContext userIdentityContext;
     private final RestClient client = RestClient.create();
 
-    public KeycloakUserManagementService(KeycloakAdminProperties properties, TenantContext tenantContext) {
+    public KeycloakUserManagementService(KeycloakAdminProperties properties, TenantContext tenantContext,
+                                         UserIdentityContext userIdentityContext) {
         this.properties = properties;
         this.tenantContext = tenantContext;
+        this.userIdentityContext = userIdentityContext;
     }
 
     public List<ManagedUserResponse> list(String search) {
@@ -80,7 +84,8 @@ public class KeycloakUserManagementService {
     public ManagedUserResponse update(String id, ManagedUserUpdateRequest request) {
         ensureConfigured();
         String tenantId = tenantContext.tenantId();
-        find(id, tenantId);
+        ManagedUserResponse currentUser = find(id, tenantId);
+        ensureAdminAccessIsRetained(currentUser, "ADMIN".equals(request.role()) && request.enabled());
         request(() -> client.put().uri(adminBase() + "/users/{id}", id).headers(this::authorization)
                 .body(Map.of(
                         "email", request.email().trim().toLowerCase(),
@@ -92,6 +97,28 @@ public class KeycloakUserManagementService {
                 )).retrieve().toBodilessEntity());
         replaceRole(id, request.role());
         return find(id, tenantId);
+    }
+
+    public void delete(String id) {
+        ensureConfigured();
+        if (id.equals(userIdentityContext.userId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Você não pode excluir a própria conta.");
+        }
+        ManagedUserResponse currentUser = find(id, tenantContext.tenantId());
+        ensureAdminAccessIsRetained(currentUser, false);
+        request(() -> client.delete().uri(adminBase() + "/users/{id}", id).headers(this::authorization)
+                .retrieve().toBodilessEntity());
+    }
+
+    private void ensureAdminAccessIsRetained(ManagedUserResponse currentUser, boolean remainsActiveAdmin) {
+        if (!"ADMIN".equals(currentUser.role()) || !currentUser.enabled() || remainsActiveAdmin) return;
+        long activeAdminCount = list(null).stream()
+                .filter(user -> "ADMIN".equals(user.role()) && user.enabled())
+                .count();
+        if (activeAdminCount <= 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Não é possível alterar, desativar ou excluir o único administrador ativo da empresa.");
+        }
     }
 
     private ManagedUserResponse find(String id, String tenantId) {
