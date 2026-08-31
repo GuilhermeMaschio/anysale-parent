@@ -46,6 +46,10 @@ KEYCLOAK_ISSUER=http://localhost:8180/realms/anysale-realm
 ANYSALE_SECURITY_KEYCLOAK_CLIENT_ID=anysale-console
 ```
 
+Para usar o painel administrativo de usuários, configure também um client de
+serviço do Keycloak no processo do Lead Service. O passo a passo e as roles
+mínimas ficam em [infra/keycloak/README.md](../infra/keycloak/README.md#painel-de-usuários-do-anysale).
+
 Nunca coloque senha administrativa do Keycloak, tokens Meta ou chave OpenAI em arquivos versionados.
 
 ## 3. Variáveis de ambiente
