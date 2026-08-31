@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @RestController
 @RequestMapping("/v1")
@@ -25,26 +26,32 @@ public class LeadCadenceController {
     public LeadCadenceController(LeadCadenceService service) { this.service = service; }
 
     @PutMapping("/playbooks/{playbookId}/cadence/steps")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SALES_MANAGER')")
     public List<CadenceStepResponse> replaceSteps(@PathVariable UUID playbookId,
                                                    @Valid @RequestBody List<@Valid CadenceStepRequest> steps) {
         return service.replaceSteps(playbookId, steps).stream().map(LeadCadenceController::step).toList();
     }
 
     @GetMapping("/playbooks/{playbookId}/cadence/steps")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SALES_MANAGER')")
     public List<CadenceStepResponse> steps(@PathVariable UUID playbookId) {
         return service.steps(playbookId).stream().map(LeadCadenceController::step).toList();
     }
 
     @PostMapping("/leads/{leadId}/cadence/start")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SALES_MANAGER')")
     public LeadCadenceResponse start(@PathVariable UUID leadId) { return cadence(service.start(leadId)); }
 
     @PostMapping("/leads/{leadId}/cadence/pause")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SALES_MANAGER')")
     public LeadCadenceResponse pause(@PathVariable UUID leadId) { return cadence(service.pause(leadId)); }
 
     @PostMapping("/leads/{leadId}/cadence/resume")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SALES_MANAGER')")
     public LeadCadenceResponse resume(@PathVariable UUID leadId) { return cadence(service.resume(leadId)); }
 
     @PostMapping("/leads/{leadId}/cadence/cancel")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SALES_MANAGER')")
     public LeadCadenceResponse cancel(@PathVariable UUID leadId) { return cadence(service.cancel(leadId)); }
 
     @GetMapping("/leads/{leadId}/cadence")
