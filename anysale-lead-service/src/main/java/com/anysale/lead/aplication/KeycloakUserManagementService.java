@@ -84,7 +84,8 @@ public class KeycloakUserManagementService {
     public ManagedUserResponse update(String id, ManagedUserUpdateRequest request) {
         ensureConfigured();
         String tenantId = tenantContext.tenantId();
-        find(id, tenantId);
+        ManagedUserResponse currentUser = find(id, tenantId);
+        ensureAdminAccessIsRetained(currentUser, "ADMIN".equals(request.role()) && request.enabled());
         request(() -> client.put().uri(adminBase() + "/users/{id}", id).headers(this::authorization)
                 .body(Map.of(
                         "email", request.email().trim().toLowerCase(),
@@ -103,9 +104,21 @@ public class KeycloakUserManagementService {
         if (id.equals(userIdentityContext.userId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Você não pode excluir a própria conta.");
         }
-        find(id, tenantContext.tenantId());
+        ManagedUserResponse currentUser = find(id, tenantContext.tenantId());
+        ensureAdminAccessIsRetained(currentUser, false);
         request(() -> client.delete().uri(adminBase() + "/users/{id}", id).headers(this::authorization)
                 .retrieve().toBodilessEntity());
+    }
+
+    private void ensureAdminAccessIsRetained(ManagedUserResponse currentUser, boolean remainsActiveAdmin) {
+        if (!"ADMIN".equals(currentUser.role()) || !currentUser.enabled() || remainsActiveAdmin) return;
+        long activeAdminCount = list(null).stream()
+                .filter(user -> "ADMIN".equals(user.role()) && user.enabled())
+                .count();
+        if (activeAdminCount <= 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Não é possível alterar, desativar ou excluir o único administrador ativo da empresa.");
+        }
     }
 
     private ManagedUserResponse find(String id, String tenantId) {
