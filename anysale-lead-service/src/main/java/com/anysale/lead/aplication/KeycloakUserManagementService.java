@@ -4,6 +4,7 @@ import com.anysale.lead.adapters.in.rest.dto.ManagedUserCreateRequest;
 import com.anysale.lead.adapters.in.rest.dto.ManagedUserResponse;
 import com.anysale.lead.adapters.in.rest.dto.ManagedUserUpdateRequest;
 import com.anysale.lead.config.KeycloakAdminProperties;
+import com.anysale.lead.tenant.TenantContext;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -29,26 +30,33 @@ public class KeycloakUserManagementService {
     private static final Set<String> ANYSALE_ROLES = Set.of("ADMIN", "SALES_MANAGER", "SALES_AGENT");
     private static final List<String> ROLE_ORDER = List.of("ADMIN", "SALES_MANAGER", "SALES_AGENT");
     private final KeycloakAdminProperties properties;
+    private final TenantContext tenantContext;
     private final RestClient client = RestClient.create();
 
-    public KeycloakUserManagementService(KeycloakAdminProperties properties) {
+    public KeycloakUserManagementService(KeycloakAdminProperties properties, TenantContext tenantContext) {
         this.properties = properties;
+        this.tenantContext = tenantContext;
     }
 
     public List<ManagedUserResponse> list(String search) {
         ensureConfigured();
+        String tenantId = tenantContext.tenantId();
         String uri = UriComponentsBuilder.fromUriString(adminBase() + "/users")
-                .queryParam("briefRepresentation", true)
                 .queryParam("max", 100)
+                .queryParam("q", "tenant_id:" + tenantId)
                 .queryParamIfPresent("search", StringUtils.hasText(search) ? java.util.Optional.of(search.trim()) : java.util.Optional.empty())
                 .toUriString();
         List<KeycloakUser> users = request(() -> client.get().uri(uri).headers(this::authorization)
                 .retrieve().body(new ParameterizedTypeReference<List<KeycloakUser>>() {}));
-        return safe(users).stream().map(this::toResponse).toList();
+        return safe(users).stream()
+                .filter(user -> belongsToTenant(user, tenantId))
+                .map(this::toResponse)
+                .toList();
     }
 
     public ManagedUserResponse create(ManagedUserCreateRequest request) {
         ensureConfigured();
+        String tenantId = tenantContext.tenantId();
         Map<String, Object> payload = Map.of(
                 "username", request.email().trim().toLowerCase(),
                 "email", request.email().trim().toLowerCase(),
@@ -56,7 +64,7 @@ public class KeycloakUserManagementService {
                 "lastName", request.lastName().trim(),
                 "enabled", true,
                 "emailVerified", false,
-                "attributes", Map.of("tenant_id", List.of(properties.tenantId()))
+                "attributes", Map.of("tenant_id", List.of(tenantId))
         );
         URI location = request(() -> client.post().uri(adminBase() + "/users").headers(this::authorization)
                 .body(payload).retrieve().toBodilessEntity().getHeaders().getLocation());
@@ -66,11 +74,13 @@ public class KeycloakUserManagementService {
         request(() -> client.put().uri(adminBase() + "/users/{id}/reset-password", id).headers(this::authorization)
                 .body(Map.of("type", "password", "value", request.temporaryPassword(), "temporary", true))
                 .retrieve().toBodilessEntity());
-        return find(id);
+        return find(id, tenantId);
     }
 
     public ManagedUserResponse update(String id, ManagedUserUpdateRequest request) {
         ensureConfigured();
+        String tenantId = tenantContext.tenantId();
+        find(id, tenantId);
         request(() -> client.put().uri(adminBase() + "/users/{id}", id).headers(this::authorization)
                 .body(Map.of(
                         "email", request.email().trim().toLowerCase(),
@@ -78,17 +88,24 @@ public class KeycloakUserManagementService {
                         "firstName", request.firstName().trim(),
                         "lastName", request.lastName().trim(),
                         "enabled", request.enabled(),
-                        "attributes", Map.of("tenant_id", List.of(properties.tenantId()))
+                        "attributes", Map.of("tenant_id", List.of(tenantId))
                 )).retrieve().toBodilessEntity());
         replaceRole(id, request.role());
-        return find(id);
+        return find(id, tenantId);
     }
 
-    private ManagedUserResponse find(String id) {
+    private ManagedUserResponse find(String id, String tenantId) {
         KeycloakUser user = request(() -> client.get().uri(adminBase() + "/users/{id}", id).headers(this::authorization)
                 .retrieve().body(KeycloakUser.class));
         if (user == null) throw unavailable("O Keycloak não retornou os dados do usuário.");
+        if (!belongsToTenant(user, tenantId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuário não encontrado nesta empresa.");
+        }
         return toResponse(user);
+    }
+
+    private boolean belongsToTenant(KeycloakUser user, String tenantId) {
+        return safe(user.attributes() == null ? null : user.attributes().get("tenant_id")).contains(tenantId);
     }
 
     private ManagedUserResponse toResponse(KeycloakUser user) {
@@ -155,6 +172,7 @@ public class KeycloakUserManagementService {
     private static String value(String value) { return Objects.requireNonNullElse(value, ""); }
     private static String formValue(String value) { return URLEncoder.encode(value, StandardCharsets.UTF_8); }
 
-    private record KeycloakUser(String id, String firstName, String lastName, String email, Boolean enabled, Long createdTimestamp) {}
+    private record KeycloakUser(String id, String firstName, String lastName, String email, Boolean enabled,
+                                Long createdTimestamp, Map<String, List<String>> attributes) {}
     private record KeycloakRole(String id, String name, String description, Boolean composite, Boolean clientRole, String containerId) {}
 }
