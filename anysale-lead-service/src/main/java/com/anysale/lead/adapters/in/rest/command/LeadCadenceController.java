@@ -4,7 +4,9 @@ import com.anysale.lead.adapters.in.rest.dto.CadenceStepRequest;
 import com.anysale.lead.adapters.in.rest.dto.CadenceStepResponse;
 import com.anysale.lead.adapters.in.rest.dto.LeadCadenceResponse;
 import com.anysale.lead.adapters.in.rest.dto.LeadCadenceRoadmapResponse;
+import com.anysale.lead.adapters.in.rest.dto.RoadmapPortfolioLeadResponse;
 import com.anysale.lead.aplication.LeadCadenceService;
+import com.anysale.lead.aplication.SalesRoadmapService;
 import com.anysale.lead.domain.model.LeadCadence;
 import com.anysale.lead.domain.model.SalesPlaybookStep;
 import jakarta.validation.Valid;
@@ -23,8 +25,12 @@ import org.springframework.security.access.prepost.PreAuthorize;
 @RequestMapping("/v1")
 public class LeadCadenceController {
     private final LeadCadenceService service;
+    private final SalesRoadmapService roadmapService;
 
-    public LeadCadenceController(LeadCadenceService service) { this.service = service; }
+    public LeadCadenceController(LeadCadenceService service, SalesRoadmapService roadmapService) {
+        this.service = service;
+        this.roadmapService = roadmapService;
+    }
 
     @PutMapping("/playbooks/{playbookId}/cadence/steps")
     @PreAuthorize("hasAnyRole('ADMIN', 'SALES_MANAGER')")
@@ -59,7 +65,24 @@ public class LeadCadenceController {
     public LeadCadenceResponse get(@PathVariable UUID leadId) { return cadence(service.get(leadId)); }
 
     @GetMapping("/leads/{leadId}/cadence/roadmap")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SALES_MANAGER')")
     public LeadCadenceRoadmapResponse roadmap(@PathVariable UUID leadId) {
+        LeadCadence cadence = service.get(leadId);
+        return new LeadCadenceRoadmapResponse(cadence(cadence),
+                service.steps(cadence.getPlaybook().getId()).stream().map(LeadCadenceController::step).toList());
+    }
+
+    @GetMapping("/me/sales-roadmap")
+    public List<RoadmapPortfolioLeadResponse> myRoadmapPortfolio() {
+        return roadmapService.portfolio().stream()
+                .map(entry -> new RoadmapPortfolioLeadResponse(entry.lead().getId(), entry.lead().getName(),
+                        entry.lead().getStage(), entry.lead().getEstimatedValue(), entry.relationship().name()))
+                .toList();
+    }
+
+    @GetMapping("/me/sales-roadmap/{leadId}")
+    public LeadCadenceRoadmapResponse myRoadmap(@PathVariable UUID leadId) {
+        roadmapService.assertCurrentUserCanFollow(leadId);
         LeadCadence cadence = service.get(leadId);
         return new LeadCadenceRoadmapResponse(cadence(cadence),
                 service.steps(cadence.getPlaybook().getId()).stream().map(LeadCadenceController::step).toList());

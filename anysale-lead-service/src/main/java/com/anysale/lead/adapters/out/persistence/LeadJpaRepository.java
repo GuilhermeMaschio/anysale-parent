@@ -44,4 +44,19 @@ public interface LeadJpaRepository extends JpaRepository<Lead, UUID> {
          order by created_at asc
          """, nativeQuery = true)
     List<Lead> findAllByNormalizedPhone(@Param("normalizedPhone") String normalizedPhone);
+
+    @EntityGraph(attributePaths = "desiredTags")
+    @Query("""
+         select l from Lead l
+         where l.tenantId = :tenant
+           and l.stage not in ('WON', 'LOST')
+           and (l.assignedTo = :user or exists (
+                select t.id from LeadTask t
+                where t.lead = l
+                  and t.tenantId = :tenant
+                  and t.assignedTo = :user
+           ))
+         order by coalesce(l.lastInteractionAt, l.updatedAt) desc
+         """)
+    List<Lead> findRoadmapPortfolio(@Param("tenant") String tenant, @Param("user") String user);
 }
