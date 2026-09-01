@@ -33,20 +33,26 @@ activates the tenant subscription.
 ## Sandbox local sem VPS
 
 O Billing Service usa a porta `8084` localmente, deixando `8083` reservada ao Ingestion Gateway.
-Para testar o Asaas antes de existir um domínio público, use os scripts em `infra/local`:
+Para o ambiente local do AnySale, prefira o túnel nomeado `anysale-sandbox`. Ele mantém os endereços
+estáveis `https://sandbox-console.anysale.com.br` e `https://sandbox-billing.anysale.com.br`,
+respectivamente encaminhados para o Console (`5173`) e o Billing Service (`8084`). O Console inicia
+esse túnel automaticamente com `npm run dev` quando ele já estiver configurado no Cloudflare.
+
+No mesmo terminal em que o Billing Service será iniciado, configure as variáveis:
 
 ```powershell
-.\infra\local\Start-BillingSandboxTunnels.ps1
-```
+.\infra\local\Set-BillingSandboxEnvironment.ps1 `
+  -ConsolePublicUrl https://sandbox-console.anysale.com.br `
+  -BillingPublicUrl https://sandbox-billing.anysale.com.br
 
-O comando abre túneis HTTPS temporários para o Console (`5173`) e para o Billing Service (`8084`) e
-mostra as duas URLs. Em seguida, configure as variáveis no terminal que iniciará o Billing Service:
-
-```powershell
-.\infra\local\Set-BillingSandboxEnvironment.ps1 -ConsolePublicUrl https://<console> -BillingPublicUrl https://<billing>
+mvn -f anysale-billing-service\pom.xml spring-boot:run
 ```
 
 O script solicita a chave Sandbox sem imprimi-la, gera um token de webhook se necessário e não grava
-segredos no repositório. Cadastre no Asaas o webhook `https://<billing>/v1/billing/webhooks/asaas` com
-o token mostrado pelo script. Para acessar o Console pelo túnel, inclua sua URL temporária nos
-**Valid redirect URIs** e **Web origins** do client `anysale-console` no Keycloak.
+segredos no repositório. Cadastre no Asaas o webhook
+`https://sandbox-billing.anysale.com.br/v1/billing/webhooks/asaas` com o token mostrado pelo script.
+O client `anysale-console` também deve autorizar `https://sandbox-console.anysale.com.br/*` nos
+**Valid redirect URIs** e `https://sandbox-console.anysale.com.br` em **Web origins** do Keycloak.
+
+O script `Start-BillingSandboxTunnels.ps1` continua disponível apenas como alternativa de URL
+temporária quando não houver domínio gerenciado pelo Cloudflare.
