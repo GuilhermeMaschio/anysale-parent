@@ -1,4 +1,4 @@
-CREATE TABLE billing_subscription (
+CREATE TABLE IF NOT EXISTS billing_subscription (
     tenant_id VARCHAR(64) PRIMARY KEY,
     provider VARCHAR(32) NOT NULL,
     provider_customer_id VARCHAR(128),
@@ -12,7 +12,9 @@ CREATE TABLE billing_subscription (
     CONSTRAINT uk_billing_subscription_provider_reference UNIQUE (provider, provider_subscription_id)
 );
 
-CREATE TABLE billing_webhook_event (
+-- This table existed in early local environments while Billing was still co-located with Lead Service.
+-- Keep the migration compatible so ownership can move to Billing without deleting webhook history.
+CREATE TABLE IF NOT EXISTS billing_webhook_event (
     id UUID PRIMARY KEY,
     provider VARCHAR(32) NOT NULL,
     provider_event_id VARCHAR(128) NOT NULL,
