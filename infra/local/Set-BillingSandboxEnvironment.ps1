@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)] [string]$ConsolePublicUrl,
-    [Parameter(Mandatory = $true)] [string]$BillingPublicUrl
+    [Parameter(Mandatory = $true)] [string]$BillingPublicUrl,
+    [switch]$RegenerateWebhookToken
 )
 
 function Normalize-Url([string]$value) { return $value.TrimEnd('/') }
@@ -11,7 +12,7 @@ $plainApiKey = [System.Net.NetworkCredential]::new('', $apiKey).Password
 if ([string]::IsNullOrWhiteSpace($plainApiKey)) { throw 'A chave de API Sandbox é obrigatória.' }
 
 $webhookToken = [Environment]::GetEnvironmentVariable('ANYSALE_BILLING_ASAAS_WEBHOOK_TOKEN')
-if ([string]::IsNullOrWhiteSpace($webhookToken)) {
+if ($RegenerateWebhookToken -or [string]::IsNullOrWhiteSpace($webhookToken)) {
     do {
         $bytes = New-Object byte[] 32
         $random = [System.Security.Cryptography.RandomNumberGenerator]::Create()
