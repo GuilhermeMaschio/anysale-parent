@@ -78,6 +78,7 @@ Comece pelos arquivos em `infra/staging/*.env.example`. Eles são modelos: copie
 | Lead Service (`8080`) | `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, `SPRING_KAFKA_BOOTSTRAP_SERVERS`, `NOTIFICATION_SERVICE_BASE_URL`, `ANYSALE_INTERNAL_TOKEN` | `ANYSALE_SECURITY_ENABLED`, `KEYCLOAK_ISSUER`, `ANYSALE_SECURITY_KEYCLOAK_CLIENT_ID`; para IA, `ANYSALE_AI_OPENAI_ENABLED`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_ALLOWED_MODELS` e, se necessário, `OPENAI_BASE_URL` |
 | Notification Service (`8081`) | `LEAD_SERVICE_BASE_URL`, `SPRING_KAFKA_BOOTSTRAP_SERVERS`, `ANYSALE_INTERNAL_TOKEN` | `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`; opcionalmente `WHATSAPP_GRAPH_API_BASE_URL` e `WHATSAPP_GRAPH_API_VERSION` |
 | Ingestion Gateway (`8083`) | `LEAD_SERVICE_BASE_URL`, `ANYSALE_INTERNAL_TOKEN` | `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`; opcionalmente os limites `LEAD_CLIENT_RETRY_*` e `LEAD_CLIENT_CB_*` |
+| Billing Service (`8084`) | `SPRING_DATASOURCE_*` | `ANYSALE_BILLING_ASAAS_*` e URLs públicas de retorno do checkout |
 | Catalog Service (`8082`) | `SPRING_DATA_MONGODB_URI`, `SPRING_KAFKA_BOOTSTRAP_SERVERS`, `SPRING_KAFKA_CONSUMER_GROUP_ID`, `SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET`, `LEAD_SERVICE_BASE_URL` | `KEYCLOAK_ISSUER` ao executar com o perfil `dev-keycloak`; `ANYSALE_CATALOG_ENCRYPTION_SECRET` para criptografia AES-256 de segredos de conectores de catálogo externos |
 
 | Console (`5173`) | `VITE_KEYCLOAK_URL`, `VITE_KEYCLOAK_REALM`, `VITE_KEYCLOAK_CLIENT_ID` | `VITE_LEAD_SERVICE_URL` em deploy, apontando para a URL pública da API/gateway |
@@ -113,9 +114,10 @@ mvn -f anysale-lead-service\pom.xml spring-boot:run "-Dspring-boot.run.profiles=
 mvn -f anysale-catalog-service\pom.xml spring-boot:run
 mvn -f anysale-notification-service\pom.xml spring-boot:run
 mvn -f anysale-ingestion-gateway\pom.xml spring-boot:run
+mvn -f anysale-billing-service\pom.xml spring-boot:run
 ```
 
-Portas: Lead `8080`, Notification `8081`, Catalog `8082`, Gateway `8083`.
+Portas: Lead `8080`, Notification `8081`, Catalog `8082`, Gateway `8083`, Billing `8084`.
 
 Na IntelliJ, use as configurações compartilhadas em `.run` ou o composto **AnySale (All Services)**. Ajuste variáveis secretas apenas na configuração local da sua IDE.
 
@@ -126,6 +128,7 @@ Invoke-WebRequest http://localhost:8080/actuator/health
 Invoke-WebRequest http://localhost:8081/actuator/health
 Invoke-WebRequest http://localhost:8082/actuator/health
 Invoke-WebRequest http://localhost:8083/actuator/health
+Invoke-WebRequest http://localhost:8084/actuator/health
 ```
 
 ## 5. Executar o Console
