@@ -65,5 +65,18 @@ class TenantBillingServiceTest {
         assertThat(subscription.getProviderSubscriptionId()).isEqualTo("sub-2");
         verify(subscriptions).save(subscription);
     }
+    @Test
+    void releasesTheTenantForANewCheckoutWhenThePreviousOneExpires() throws Exception {
+        BillingCheckout checkout = new BillingCheckout(); checkout.setTenantId("tenant-a"); checkout.setPlanCode("ESSENTIAL");
+        TenantSubscription subscription = new TenantSubscription(); subscription.setPlanCode("ESSENTIAL"); subscription.setStatus("CHECKOUT_PENDING");
+        when(events.findByProviderAndProviderEventId("ASAAS", "evt-3")).thenReturn(Optional.empty());
+        when(checkouts.findByProviderAndProviderCheckoutId("ASAAS", "checkout-1")).thenReturn(Optional.of(checkout));
+        when(subscriptions.findById("tenant-a")).thenReturn(Optional.of(subscription));
+        service().receiveAsaasWebhook("token", new ObjectMapper().readTree("""
+                {"id":"evt-3","event":"CHECKOUT_EXPIRED","checkout":{"id":"checkout-1"}}
+                """));
+        assertThat(subscription.getStatus()).isEqualTo("CHECKOUT_EXPIRED");
+        verify(subscriptions).save(subscription);
+    }
     private TenantBillingService service(){return new TenantBillingService(subscriptions,events,plans,checkouts,tenants,new AsaasBillingProperties(true,"unused","token","https://api.asaas.com/v3","https://app/success","https://app/cancel","https://app/expired"),new ObjectMapper(),checkoutClient);}
 }

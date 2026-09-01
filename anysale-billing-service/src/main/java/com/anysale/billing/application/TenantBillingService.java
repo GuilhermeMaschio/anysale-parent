@@ -53,8 +53,10 @@ public class TenantBillingService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Plano não encontrado."));
         if (plan.getMonthlyPriceCents() == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Este plano requer uma proposta comercial.");
         String tenant = tenants.tenantId();
-        subscriptions.findById(tenant).filter(current -> "ACTIVE".equals(current.getStatus()))
-                .ifPresent(current -> { throw new ResponseStatusException(HttpStatus.CONFLICT, "A empresa já possui uma assinatura ativa."); });
+        subscriptions.findById(tenant).ifPresent(current -> {
+            if ("ACTIVE".equals(current.getStatus())) throw new ResponseStatusException(HttpStatus.CONFLICT, "A empresa já possui uma assinatura ativa.");
+            if ("CHECKOUT_PENDING".equals(current.getStatus())) throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um pagamento aguardando conclusão. Finalize-o ou aguarde sua expiração antes de tentar novamente.");
+        });
         Instant firstDue = Instant.now().plus(java.time.Duration.ofDays(plan.getTrialDays()));
         String externalReference = "billing:" + tenant + ":" + UUID.randomUUID();
         AsaasCheckoutClient.CheckoutSession session = checkoutClient.create(plan, externalReference, firstDue);
@@ -94,6 +96,9 @@ public class TenantBillingService {
         checkoutId(payload).flatMap(id -> checkouts.findByProviderAndProviderCheckoutId(PROVIDER,id)).ifPresent(checkout -> {
             checkout.setStatus(checkoutStatus(type)); checkouts.save(checkout);
             if ("CHECKOUT_PAID".equals(type)) subscriptions.findById(checkout.getTenantId()).ifPresent(value -> { value.setStatus("ACTIVE"); subscriptions.save(value); });
+            if ("CHECKOUT_CANCELED".equals(type) || "CHECKOUT_EXPIRED".equals(type)) subscriptions.findById(checkout.getTenantId())
+                    .filter(value -> "CHECKOUT_PENDING".equals(value.getStatus()) && checkout.getPlanCode().equals(value.getPlanCode()))
+                    .ifPresent(value -> { value.setStatus("CHECKOUT_" + ("CHECKOUT_CANCELED".equals(type) ? "CANCELLED" : "EXPIRED")); subscriptions.save(value); });
             event.setProcessingResult("APPLIED");
         });
         event.setProcessedAt(Instant.now()); events.save(event);
