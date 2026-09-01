@@ -1,0 +1,5 @@
+CREATE TABLE cadence_enrollment_settings (
+    tenant_id VARCHAR(120) PRIMARY KEY,
+    enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

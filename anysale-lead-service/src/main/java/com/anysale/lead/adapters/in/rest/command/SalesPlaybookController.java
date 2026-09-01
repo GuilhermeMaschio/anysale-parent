@@ -1,0 +1,23 @@
+package com.anysale.lead.adapters.in.rest.command;
+
+import com.anysale.lead.adapters.in.rest.dto.*;
+import com.anysale.lead.aplication.SalesPlaybookService;
+import com.anysale.lead.domain.model.SalesPlaybook;
+import jakarta.validation.Valid;
+import java.util.*;
+import org.springframework.http.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/v1/playbooks")
+@PreAuthorize("hasAnyRole('ADMIN', 'SALES_MANAGER')")
+public class SalesPlaybookController {
+    private final SalesPlaybookService s;
+    public SalesPlaybookController(SalesPlaybookService x) { s=x; }
+    @PostMapping public ResponseEntity<SalesPlaybookResponse> create(@Valid @RequestBody SalesPlaybookRequest r) { SalesPlaybook p=s.create(r); return ResponseEntity.status(201).body(dto(p)); }
+    @PutMapping("/{id}") public SalesPlaybookResponse update(@PathVariable UUID id,@Valid @RequestBody SalesPlaybookRequest r) { return dto(s.update(id,r)); }
+    @GetMapping public List<SalesPlaybookResponse> list() { return s.list().stream().map(SalesPlaybookController::dto).toList(); }
+    @GetMapping("/resolve/lead/{leadId}") public SalesPlaybookResponse resolve(@PathVariable UUID leadId) { return dto(s.resolve(leadId)); }
+    static SalesPlaybookResponse dto(SalesPlaybook p) { return new SalesPlaybookResponse(p.getId(),p.getName(),p.getDescription(),p.isActive(),p.isDefaultPlaybook(),p.getVersion(),Set.copyOf(p.getCategories())); }
+}

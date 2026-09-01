@@ -42,18 +42,20 @@ public class LeadService {
     private final LeadEventPublisher events;
     private final LeadStageHistoryJpaRepository stageHistoryRepo;
     private final TenantContext tenantContext;
+    private final CadenceEnrollmentService cadenceEnrollment;
 
     public LeadService(LeadJpaRepository leadRepo,
                        LeadSuggestionJpaRepository suggestionRepo,
                        InteractionJpaRepository interactionRepo,
                        LeadEventPublisher events, LeadStageHistoryJpaRepository stageHistoryRepo,
-                       TenantContext tenantContext) {
+                       TenantContext tenantContext, CadenceEnrollmentService cadenceEnrollment) {
         this.leadRepo = leadRepo;
         this.suggestionRepo = suggestionRepo;
         this.interactionRepo = interactionRepo;
         this.events = events;
         this.stageHistoryRepo = stageHistoryRepo;
         this.tenantContext = tenantContext;
+        this.cadenceEnrollment = cadenceEnrollment;
     }
 
     @Transactional
@@ -69,6 +71,7 @@ public class LeadService {
         lead.setDesiredTags(desiredTags != null ? new ArrayList<>(desiredTags) : new ArrayList<>());
         Lead saved = leadRepo.saveAndFlush(lead); // flush já aqui
         recordStageHistory(saved, null, saved.getStage(), "SYSTEM", "LEAD_CREATED");
+        cadenceEnrollment.enrollIfEnabled(saved);
 
         // publicar APÓS o commit (ou imediatamente se não houver transação)
         publishAfterCommitOrNow(() -> events.publishLeadCreated(saved));

@@ -36,3 +36,26 @@ access token in the `Authorization: Bearer` header for every API call.
 
 The bootstrap password is only a local default. Set unique secrets outside the
 repository for staging and production; do not use `start-dev` there.
+
+## Painel de usuários do AnySale
+
+O Console nunca recebe uma credencial administrativa do Keycloak. Para liberar
+a tela **Usuários** para administradores do AnySale, crie no realm
+`anysale-realm` um client confidencial de serviço, por exemplo
+`anysale-user-admin`:
+
+1. Desative **Standard flow** e **Direct access grants**; ative **Service accounts roles**.
+2. Copie o segredo gerado na aba **Credentials** para o ambiente do Lead Service.
+3. Em **Service account roles**, no client `realm-management`, atribua
+   `query-users`, `view-users` e `manage-users`.
+
+Configure somente no processo do Lead Service:
+
+```env
+ANYSALE_KEYCLOAK_ADMIN_ENABLED=true
+ANYSALE_KEYCLOAK_ADMIN_CLIENT_ID=anysale-user-admin
+ANYSALE_KEYCLOAK_ADMIN_CLIENT_SECRET=<segredo-do-client>
+```
+
+O endpoint `/v1/admin/users` exige a role de realm `ADMIN`, além da credencial
+de serviço acima. Não use variáveis `VITE_*` para essas configurações.
