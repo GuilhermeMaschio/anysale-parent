@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import java.util.List;
 
 @RestController @RequestMapping("/v1/billing")
 public class TenantBillingController {
@@ -18,6 +19,8 @@ public class TenantBillingController {
     public TenantBillingController(TenantBillingService service){this.service=service;}
     @GetMapping("/subscription") @PreAuthorize("hasRole('ADMIN')")
     public TenantSubscriptionResponse subscription(){return service.currentSubscription();}
+    @GetMapping("/plans")
+    public List<BillingPlanResponse> plans(){return service.availablePlans();}
     @PostMapping("/webhooks/asaas") @ResponseStatus(HttpStatus.NO_CONTENT)
     public void asaasWebhook(@RequestHeader(value="asaas-access-token",required=false) String token,@RequestBody JsonNode payload){service.receiveAsaasWebhook(token,payload);}
 }

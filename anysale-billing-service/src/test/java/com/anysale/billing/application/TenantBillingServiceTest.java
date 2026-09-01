@@ -8,6 +8,7 @@ import com.anysale.billing.config.AsaasBillingProperties;
 import com.anysale.billing.domain.BillingWebhookEvent;
 import com.anysale.billing.domain.TenantSubscription;
 import com.anysale.billing.persistence.BillingWebhookEventRepository;
+import com.anysale.billing.persistence.BillingPlanRepository;
 import com.anysale.billing.persistence.TenantSubscriptionRepository;
 import com.anysale.billing.tenant.TenantContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class TenantBillingServiceTest {
     @Mock TenantSubscriptionRepository subscriptions;
     @Mock BillingWebhookEventRepository events;
+    @Mock BillingPlanRepository plans;
     @Mock TenantContext tenants;
     @Test
     void confirmsOnlyTheMappedTenantSubscription() throws Exception {
@@ -35,5 +37,5 @@ class TenantBillingServiceTest {
         ArgumentCaptor<BillingWebhookEvent> event=ArgumentCaptor.forClass(BillingWebhookEvent.class); verify(events).save(event.capture());
         assertThat(event.getValue().getProcessingResult()).isEqualTo("APPLIED");
     }
-    private TenantBillingService service(){return new TenantBillingService(subscriptions,events,tenants,new AsaasBillingProperties(true,"unused","token"),new ObjectMapper());}
+    private TenantBillingService service(){return new TenantBillingService(subscriptions,events,plans,tenants,new AsaasBillingProperties(true,"unused","token"),new ObjectMapper());}
 }

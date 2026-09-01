@@ -5,6 +5,7 @@ import com.anysale.billing.config.AsaasBillingProperties;
 import com.anysale.billing.domain.BillingWebhookEvent;
 import com.anysale.billing.domain.TenantSubscription;
 import com.anysale.billing.persistence.BillingWebhookEventRepository;
+import com.anysale.billing.persistence.BillingPlanRepository;
 import com.anysale.billing.persistence.TenantSubscriptionRepository;
 import com.anysale.billing.tenant.TenantContext;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -12,6 +13,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,12 +25,19 @@ public class TenantBillingService {
     private static final String PROVIDER = "ASAAS";
     private final TenantSubscriptionRepository subscriptions;
     private final BillingWebhookEventRepository events;
+    private final BillingPlanRepository plans;
     private final TenantContext tenants;
     private final AsaasBillingProperties asaas;
     private final ObjectMapper mapper;
     public TenantBillingService(TenantSubscriptionRepository subscriptions, BillingWebhookEventRepository events,
-                                TenantContext tenants, AsaasBillingProperties asaas, ObjectMapper mapper) {
-        this.subscriptions=subscriptions; this.events=events; this.tenants=tenants; this.asaas=asaas; this.mapper=mapper;
+                                BillingPlanRepository plans, TenantContext tenants, AsaasBillingProperties asaas, ObjectMapper mapper) {
+        this.subscriptions=subscriptions; this.events=events; this.plans=plans; this.tenants=tenants; this.asaas=asaas; this.mapper=mapper;
+    }
+    @Transactional(readOnly = true)
+    public List<com.anysale.billing.api.BillingPlanResponse> availablePlans() {
+        return plans.findByActiveTrueOrderByMonthlyPriceCentsAsc().stream().map(plan -> new com.anysale.billing.api.BillingPlanResponse(
+                plan.getCode(), plan.getName(), plan.getDescription(), plan.getMonthlyPriceCents(), plan.getUserLimit(),
+                plan.getMonthlyLeadLimit(), plan.getMonthlyAiRequestLimit(), plan.getTrialDays(), plan.getGraceDays())).toList();
     }
     @Transactional(readOnly = true)
     public TenantSubscriptionResponse currentSubscription() {

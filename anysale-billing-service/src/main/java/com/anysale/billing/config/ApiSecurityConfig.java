@@ -28,6 +28,7 @@ public class ApiSecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers(HttpMethod.POST, "/v1/billing/webhooks/asaas").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/v1/billing/plans").permitAll()
                         .requestMatchers("/v1/**").authenticated().anyRequest().denyAll())
                 .oauth2ResourceServer(resource -> resource.jwt(jwt -> jwt.jwtAuthenticationConverter(converter(clientId)))).build();
     }
