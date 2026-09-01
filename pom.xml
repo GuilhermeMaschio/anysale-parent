@@ -22,6 +22,7 @@
         <module>anysale-lead-service</module>
         <module>anysale-catalog-service</module>
         <module>anysale-notification-service</module>
+        <module>anysale-billing-service</module>
         <module>anysale-shared-kernel</module>
         <module>anysale-contracts</module>
     </modules>
