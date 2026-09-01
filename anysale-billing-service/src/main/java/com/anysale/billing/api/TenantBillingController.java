@@ -18,11 +18,11 @@ import java.util.List;
 public class TenantBillingController {
     private final TenantBillingService service;
     public TenantBillingController(TenantBillingService service){this.service=service;}
-    @GetMapping("/subscription") @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/subscription") @PreAuthorize("@billingAccess.administrator(authentication)")
     public TenantSubscriptionResponse subscription(){return service.currentSubscription();}
     @GetMapping("/plans")
     public List<BillingPlanResponse> plans(){return service.availablePlans();}
-    @PostMapping("/checkout") @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/checkout") @PreAuthorize("@billingAccess.administrator(authentication)")
     public BillingCheckoutResponse checkout(@Valid @RequestBody BillingCheckoutRequest request){return service.startCheckout(request.planCode());}
     @PostMapping("/webhooks/asaas") @ResponseStatus(HttpStatus.NO_CONTENT)
     public void asaasWebhook(@RequestHeader(value="asaas-access-token",required=false) String token,@RequestBody JsonNode payload){service.receiveAsaasWebhook(token,payload);}
