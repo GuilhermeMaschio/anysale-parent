@@ -13,7 +13,12 @@ if ([string]::IsNullOrWhiteSpace($plainApiKey)) { throw 'A chave de API Sandbox 
 $webhookToken = [Environment]::GetEnvironmentVariable('ANYSALE_BILLING_ASAAS_WEBHOOK_TOKEN')
 if ([string]::IsNullOrWhiteSpace($webhookToken)) {
     $bytes = New-Object byte[] 32
-    [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+    $random = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $random.GetBytes($bytes)
+    } finally {
+        $random.Dispose()
+    }
     $webhookToken = [Convert]::ToBase64String($bytes)
     Write-Host "Token de webhook gerado (cadastre-o no Asaas): $webhookToken"
 }
