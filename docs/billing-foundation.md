@@ -21,3 +21,11 @@ will add the plan catalog and checkout that creates this mapping before any webh
 
 All initial plans have 14 trial days and a 5-day payment grace period. The next increment uses this
 catalog to create the provider subscription and later enforces its limits at the appropriate services.
+
+## Hosted recurring checkout
+
+`POST /v1/billing/checkout` is available only to tenant ADMINs. It accepts a plan code and returns
+the hosted Asaas checkout URL. The payment page receives card data directly; AnySale never handles
+card numbers. The checkout is created as `RECURRENT`, monthly, with the first charge due after the
+plan trial period. Asaas callbacks only control navigation: `CHECKOUT_PAID` webhook is the event that
+activates the tenant subscription.

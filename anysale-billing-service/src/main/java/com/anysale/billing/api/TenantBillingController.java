@@ -2,6 +2,7 @@ package com.anysale.billing.api;
 
 import com.anysale.billing.application.TenantBillingService;
 import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,6 +22,8 @@ public class TenantBillingController {
     public TenantSubscriptionResponse subscription(){return service.currentSubscription();}
     @GetMapping("/plans")
     public List<BillingPlanResponse> plans(){return service.availablePlans();}
+    @PostMapping("/checkout") @PreAuthorize("hasRole('ADMIN')")
+    public BillingCheckoutResponse checkout(@Valid @RequestBody BillingCheckoutRequest request){return service.startCheckout(request.planCode());}
     @PostMapping("/webhooks/asaas") @ResponseStatus(HttpStatus.NO_CONTENT)
     public void asaasWebhook(@RequestHeader(value="asaas-access-token",required=false) String token,@RequestBody JsonNode payload){service.receiveAsaasWebhook(token,payload);}
 }

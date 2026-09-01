@@ -21,4 +21,6 @@ public class BillingPlan {
     public Integer getMonthlyPriceCents(){return monthlyPriceCents;} public Integer getUserLimit(){return userLimit;}
     public Integer getMonthlyLeadLimit(){return monthlyLeadLimit;} public Integer getMonthlyAiRequestLimit(){return monthlyAiRequestLimit;}
     public int getTrialDays(){return trialDays;} public int getGraceDays(){return graceDays;} public boolean isActive(){return active;}
+    public void setCode(String value){code=value;} public void setName(String value){name=value;} public void setDescription(String value){description=value;}
+    public void setMonthlyPriceCents(Integer value){monthlyPriceCents=value;} public void setTrialDays(int value){trialDays=value;} public void setActive(boolean value){active=value;}
 }
