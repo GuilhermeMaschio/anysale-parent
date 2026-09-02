@@ -56,3 +56,10 @@ O client `anysale-console` também deve autorizar `https://sandbox-console.anysa
 
 O script `Start-BillingSandboxTunnels.ps1` continua disponível apenas como alternativa de URL
 temporária quando não houver domínio gerenciado pelo Cloudflare.
+
+### Eventos do webhook
+
+Para manter a assinatura e o checkout sincronizados, selecione no Asaas os eventos `CHECKOUT_PAID`,
+`CHECKOUT_CANCELED`, `CHECKOUT_EXPIRED`, `SUBSCRIPTION_CREATED`, `PAYMENT_RECEIVED`,
+`PAYMENT_CONFIRMED`, `PAYMENT_OVERDUE`, `PAYMENT_DUNNING_REQUESTED`,
+`SUBSCRIPTION_INACTIVATED` e `SUBSCRIPTION_DELETED`.

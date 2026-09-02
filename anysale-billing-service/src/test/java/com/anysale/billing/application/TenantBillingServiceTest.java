@@ -78,5 +78,13 @@ class TenantBillingServiceTest {
         assertThat(subscription.getStatus()).isEqualTo("CHECKOUT_EXPIRED");
         verify(subscriptions).save(subscription);
     }
+    @Test
+    void returnsTheExistingCheckoutWhileTheTenantIsStillAwaitingPayment() {
+        BillingCheckout checkout = new BillingCheckout(); checkout.setTenantId("tenant-a"); checkout.setPlanCode("ESSENTIAL"); checkout.setCheckoutUrl("https://asaas.example/checkout-1"); checkout.setStatus("ACTIVE"); checkout.setExpiresAt(Instant.now().plusSeconds(600));
+        TenantSubscription subscription = new TenantSubscription(); subscription.setStatus("CHECKOUT_PENDING");
+        when(tenants.tenantId()).thenReturn("tenant-a"); when(subscriptions.findById("tenant-a")).thenReturn(Optional.of(subscription));
+        when(checkouts.findFirstByTenantIdAndStatusAndExpiresAtAfterOrderByCreatedAtDesc(org.mockito.ArgumentMatchers.eq("tenant-a"), org.mockito.ArgumentMatchers.eq("ACTIVE"), org.mockito.ArgumentMatchers.any(Instant.class))).thenReturn(Optional.of(checkout));
+        assertThat(service().pendingCheckout()).contains(new BillingCheckoutResponse("https://asaas.example/checkout-1", checkout.getExpiresAt(), "ESSENTIAL"));
+    }
     private TenantBillingService service(){return new TenantBillingService(subscriptions,events,plans,checkouts,tenants,new AsaasBillingProperties(true,"unused","token","https://api.asaas.com/v3","https://app/success","https://app/cancel","https://app/expired"),new ObjectMapper(),checkoutClient);}
 }

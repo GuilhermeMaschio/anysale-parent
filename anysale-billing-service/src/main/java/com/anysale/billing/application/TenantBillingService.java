@@ -72,6 +72,14 @@ public class TenantBillingService {
         return subscriptions.findById(tenant).map(this::response)
                 .orElse(new TenantSubscriptionResponse(tenant, null, "NOT_CONFIGURED", "SETUP_REQUIRED", null, null));
     }
+    @Transactional(readOnly = true)
+    public Optional<BillingCheckoutResponse> pendingCheckout() {
+        String tenant = tenants.tenantId();
+        boolean awaitingPayment = subscriptions.findById(tenant).map(subscription -> "CHECKOUT_PENDING".equals(subscription.getStatus())).orElse(false);
+        if (!awaitingPayment) return Optional.empty();
+        return checkouts.findFirstByTenantIdAndStatusAndExpiresAtAfterOrderByCreatedAtDesc(tenant, "ACTIVE", Instant.now())
+                .map(checkout -> new BillingCheckoutResponse(checkout.getCheckoutUrl(), checkout.getExpiresAt(), checkout.getPlanCode()));
+    }
     @Transactional
     public void receiveAsaasWebhook(String token, JsonNode payload) {
         ensureToken(token);
